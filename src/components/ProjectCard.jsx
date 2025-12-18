@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Edit2, Heart } from 'lucide-react';
-import { toggleLike } from '../lib/firebase';
+import { ExternalLink, Edit2, Heart, MessageCircle } from 'lucide-react';
+import { toggleLike, subscribeToComments } from '../lib/firebase';
 
 const ProjectCard = ({ project, onEdit, onClick }) => {
 	const [isLiking, setIsLiking] = useState(false);
+	const [commentCount, setCommentCount] = useState(0);
 	const sessionId = localStorage.getItem('hackathon_session_id');
 	const isLiked = project.likedBy?.includes(sessionId);
+
+	// Subscribe to comments count
+	React.useEffect(() => {
+		const unsubscribe = subscribeToComments(project.id, (comments) => {
+			setCommentCount(comments.length);
+		});
+		return () => unsubscribe();
+	}, [project.id]);
 
 	const handleEditClick = (e) => {
 		e.preventDefault();
@@ -118,23 +127,31 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 					{project.description}
 				</p>
 
-				<div className="mt-auto w-full flex space-x-2">
-					<button
-						onClick={handleLike}
-						className={`flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-lg text-sm font-bold transition-all border ${isLiked
-							? 'bg-red-50 text-red-500 border-red-100'
-							: 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-							}`}
-					>
-						<Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-						<span>{project.likes || 0}</span>
-					</button>
+				<div className="mt-auto w-full flex flex-col gap-3">
+					<div className="flex items-center gap-2">
+						<button
+							onClick={handleLike}
+							className={`flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-lg text-sm font-bold transition-all border ${isLiked
+								? 'bg-red-50 text-red-500 border-red-100'
+								: 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+								}`}
+						>
+							<Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+							<span>{project.likes || 0}</span>
+						</button>
+
+						<div className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-lg text-sm font-bold bg-white text-gray-500 border border-gray-200">
+							<MessageCircle className="w-4 h-4" />
+							<span>{commentCount}</span>
+						</div>
+					</div>
 
 					<a
 						href={project.url}
 						target="_blank"
 						rel="noopener noreferrer"
-						className="flex-1 flex items-center justify-center space-x-2 py-2.5 px-4 bg-gray-50 hover:bg-kakao-yellow hover:text-kakao-black text-gray-700 rounded-lg text-sm font-bold transition-colors"
+						onClick={(e) => e.stopPropagation()}
+						className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-gray-50 hover:bg-kakao-yellow hover:text-kakao-black text-gray-700 rounded-lg text-sm font-bold transition-colors"
 					>
 						<span>보러가기</span>
 						<ExternalLink className="w-4 h-4" />
