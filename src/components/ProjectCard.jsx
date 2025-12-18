@@ -62,14 +62,14 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.3 }}
 			onClick={onClick}
-			className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border border-gray-100 flex flex-col h-full group relative cursor-pointer"
+			className="bg-white rounded-xl shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-[480px] group relative cursor-pointer ring-1 ring-gray-100 hover:ring-kakao-yellow/50"
 		>
-			<div className="relative aspect-video overflow-hidden bg-gray-100">
+			<div className="relative h-44 overflow-hidden bg-gray-100 flex-shrink-0">
 				{project.imageUrl ? (
 					<img
 						src={project.imageUrl}
 						alt={project.title}
-						className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+						className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
 						onError={(e) => {
 							e.target.src = "https://via.placeholder.com/640x360?text=No+Image";
 						}}
@@ -80,9 +80,11 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 					</div>
 				)}
 
+				<div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
 				{/* Team Badge */}
 				{project.team && (
-					<div className="absolute top-3 left-3 bg-kakao-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm">
+					<div className="absolute top-3 left-3 bg-kakao-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg">
 						{project.team}
 					</div>
 				)}
@@ -90,40 +92,36 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 				{/* Edit Button */}
 				<button
 					onClick={handleEditClick}
-					className="absolute top-3 right-3 p-1.5 bg-white/90 rounded-full text-gray-600 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-sm z-10"
+					className="absolute top-3 right-3 p-2 bg-white rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg z-10 transform translate-y-2 group-hover:translate-y-0"
 					title="수정하기"
 				>
-					<Edit2 className="w-3.5 h-3.5" />
+					<Edit2 className="w-4 h-4" />
 				</button>
 			</div>
 
-			<div className="p-5 flex-1 flex flex-col">
-				{/* Tags */}
-				{project.tags && project.tags.length > 0 && (
-					<div className="flex flex-wrap gap-1.5 mb-3">
-						{project.tags.map((tag, idx) => (
-							<span key={idx} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${getTagStyle(tag)}`}>
-								{tag}
-							</span>
-						))}
-					</div>
-				)}
+			<div className="p-5 flex-1 flex flex-col overflow-hidden relative">
+				{/* Tags - Truncate long tags */}
+				<div className="h-6 mb-2 overflow-hidden flex flex-wrap gap-1.5">
+					{project.tags && project.tags.map((tag, idx) => (
+						<span key={idx} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium truncate max-w-[100px] inline-block ${getTagStyle(tag)}`}>
+							{tag}
+						</span>
+					))}
+				</div>
 
-				{/* Members */}
-				{project.members && project.members.length > 0 && (
-					<div className="flex flex-wrap gap-1 mb-2">
-						{project.members.map((member, idx) => (
-							<span key={idx} className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-								{member}
-							</span>
-						))}
-					</div>
-				)}
+				{/* Members - Force 1 line */}
+				<div className="h-5 mb-2 overflow-hidden text-xs text-gray-500 flex flex-nowrap gap-1 items-center">
+					{project.members && project.members.map((member, idx) => (
+						<span key={idx} className="bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+							{member}
+						</span>
+					))}
+				</div>
 
-				<h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">
+				<h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-1 group-hover:text-kakao-black transition-colors">
 					{project.title}
 				</h3>
-				<p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-1 break-keep">
+				<p className="text-gray-600 text-sm mb-auto line-clamp-1 h-5">
 					{project.description}
 				</p>
 

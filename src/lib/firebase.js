@@ -16,7 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, getDoc, arrayUnion, arrayRemove, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, getDoc, arrayUnion, arrayRemove, deleteDoc, increment, getCountFromServer } from "firebase/firestore";
 
 const COLLECTION_NAME = "projects";
 
@@ -102,6 +102,13 @@ export const addComment = async (projectId, commentData) => {
 			...commentData,
 			createdAt: serverTimestamp(),
 		});
+
+		// Update comment count on project document
+		const projectRef = doc(db, COLLECTION_NAME, projectId);
+		await updateDoc(projectRef, {
+			commentCount: increment(1)
+		});
+
 		return { success: true };
 	} catch (error) {
 		console.error("Error adding comment: ", error);
@@ -132,6 +139,13 @@ export const deleteComment = async (projectId, commentId, password) => {
 			const data = commentSnap.data();
 			if (data.password === password) {
 				await deleteDoc(commentRef);
+
+				// Update comment count on project document
+				const projectRef = doc(db, COLLECTION_NAME, projectId);
+				await updateDoc(projectRef, {
+					commentCount: increment(-1)
+				});
+
 				return { success: true };
 			} else {
 				return { success: false, error: "Incorrect password" };
@@ -141,6 +155,32 @@ export const deleteComment = async (projectId, commentId, password) => {
 		}
 	} catch (error) {
 		console.error("Error deleting comment: ", error);
+		return { success: false, error };
+	}
+};
+
+export const syncCommentCounts = async () => {
+	try {
+		const projectsQuery = query(collection(db, COLLECTION_NAME));
+		const snapshot = await getCountFromServer(projectsQuery); // Just to check connectivity or basic read? No, need docs.
+
+		// We need to fetch all projects first
+		const projectsSnap = await import("firebase/firestore").then(mod => mod.getDocs(projectsQuery));
+
+		let updated = 0;
+		for (const docSnap of projectsSnap.docs) {
+			const commentsRef = collection(db, COLLECTION_NAME, docSnap.id, "comments");
+			const countSnap = await getCountFromServer(commentsRef);
+			const count = countSnap.data().count;
+
+			await updateDoc(doc(db, COLLECTION_NAME, docSnap.id), {
+				commentCount: count
+			});
+			updated++;
+		}
+		return { success: true, count: updated };
+	} catch (error) {
+		console.error("Sync error:", error);
 		return { success: false, error };
 	}
 };
