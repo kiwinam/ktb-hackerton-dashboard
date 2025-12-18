@@ -12,7 +12,7 @@ const container = {
 	}
 };
 
-const ProjectList = ({ projects, onEdit }) => {
+const ProjectList = ({ projects, onEdit, onCardClick }) => {
 	if (projects.length === 0) {
 		return (
 			<div className="text-center py-24 flex flex-col items-center justify-center">
@@ -34,7 +34,7 @@ const ProjectList = ({ projects, onEdit }) => {
 			className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
 		>
 			{projects.map((project) => (
-				<ProjectCard key={project.id} project={project} onEdit={onEdit} />
+				<ProjectCard key={project.id} project={project} onEdit={onEdit} onClick={() => onCardClick(project)} />
 			))}
 		</motion.div>
 	);

@@ -3,6 +3,7 @@ import Header from './components/Header';
 import ProjectList from './components/ProjectList';
 import RegisterModal from './components/RegisterModal';
 import PasswordModal from './components/PasswordModal';
+import ProjectDetailModal from './components/ProjectDetailModal';
 import Toast from './components/Toast';
 import { subscribeToProjects } from './lib/firebase';
 import { AnimatePresence } from 'framer-motion';
@@ -12,6 +13,7 @@ function App() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [pendingEditProject, setPendingEditProject] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null); // For detail modal
   const [projects, setProjects] = useState([]);
   // Initialize from localStorage or default to 'latest'
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('project_sort_order') || 'latest');
@@ -114,9 +116,20 @@ function App() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-kakao-yellow"></div>
           </div>
         ) : (
-          <ProjectList projects={sortedProjects} onEdit={handleEditClick} />
+          <ProjectList
+            projects={sortedProjects}
+            onEdit={handleEditClick}
+            onCardClick={setSelectedProject}
+          />
         )}
       </main>
+
+      {/* Detail Modal */}
+      <ProjectDetailModal
+        project={selectedProject}
+        isOpen={!!selectedProject}
+        onClose={() => setSelectedProject(null)}
+      />
 
       <RegisterModal
         isOpen={isModalOpen}

@@ -16,7 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, getDoc, arrayUnion, arrayRemove, deleteDoc } from "firebase/firestore";
 
 const COLLECTION_NAME = "projects";
 
@@ -93,5 +93,54 @@ export const toggleLike = async (docId, sessionId) => {
 	} catch (error) {
 		console.error("Error toggling like:", error);
 		return { error };
+	}
+};
+
+export const addComment = async (projectId, commentData) => {
+	try {
+		await addDoc(collection(db, COLLECTION_NAME, projectId, "comments"), {
+			...commentData,
+			createdAt: serverTimestamp(),
+		});
+		return { success: true };
+	} catch (error) {
+		console.error("Error adding comment: ", error);
+		return { success: false, error };
+	}
+};
+
+export const subscribeToComments = (projectId, callback) => {
+	const q = query(
+		collection(db, COLLECTION_NAME, projectId, "comments"),
+		orderBy("createdAt", "desc")
+	);
+	return onSnapshot(q, (snapshot) => {
+		const comments = snapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data(),
+		}));
+		callback(comments);
+	});
+};
+
+export const deleteComment = async (projectId, commentId, password) => {
+	try {
+		const commentRef = doc(db, COLLECTION_NAME, projectId, "comments", commentId);
+		const commentSnap = await getDoc(commentRef);
+
+		if (commentSnap.exists()) {
+			const data = commentSnap.data();
+			if (data.password === password) {
+				await deleteDoc(commentRef);
+				return { success: true };
+			} else {
+				return { success: false, error: "Incorrect password" };
+			}
+		} else {
+			return { success: false, error: "Comment not found" };
+		}
+	} catch (error) {
+		console.error("Error deleting comment: ", error);
+		return { success: false, error };
 	}
 };

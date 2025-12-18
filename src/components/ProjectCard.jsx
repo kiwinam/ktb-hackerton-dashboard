@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ExternalLink, Edit2, Heart } from 'lucide-react';
 import { toggleLike } from '../lib/firebase';
 
-const ProjectCard = ({ project, onEdit }) => {
+const ProjectCard = ({ project, onEdit, onClick }) => {
 	const [isLiking, setIsLiking] = useState(false);
 	const sessionId = localStorage.getItem('hackathon_session_id');
 	const isLiked = project.likedBy?.includes(sessionId);
@@ -52,7 +52,8 @@ const ProjectCard = ({ project, onEdit }) => {
 			initial={{ opacity: 0, y: 20 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.3 }}
-			className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border border-gray-100 flex flex-col h-full group relative"
+			onClick={onClick}
+			className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border border-gray-100 flex flex-col h-full group relative cursor-pointer"
 		>
 			<div className="relative aspect-video overflow-hidden bg-gray-100">
 				{project.imageUrl ? (
