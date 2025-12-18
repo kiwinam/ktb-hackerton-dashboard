@@ -7,7 +7,7 @@ import PasswordModal from './components/PasswordModal';
 import ProjectDetailModal from './components/ProjectDetailModal';
 import Toast from './components/Toast';
 import { subscribeToProjects } from './lib/firebase';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);

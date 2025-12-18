@@ -219,10 +219,11 @@ const ProjectDetailModal = ({ project, isOpen, onClose }) => {
 												<div className="flex gap-2">
 													<input
 														type="text"
-														placeholder="응원의 댓글을 남겨주세요! (비속어 금지)"
+														placeholder="응원의 댓글을 남겨주세요! (최대 100자, 비속어 금지)"
 														value={newComment}
 														onChange={(e) => setNewComment(e.target.value)}
 														required
+														maxLength={100}
 														className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
 													/>
 													<button
