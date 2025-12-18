@@ -17,10 +17,14 @@ const ProjectDetailModal = ({ project, isOpen, onClose }) => {
 
 	useEffect(() => {
 		if (isOpen && project) {
+			document.body.style.overflow = 'hidden';
 			const unsubscribe = subscribeToComments(project.id, (data) => {
 				setComments(data);
 			});
-			return () => unsubscribe();
+			return () => {
+				document.body.style.overflow = 'unset';
+				unsubscribe();
+			};
 		}
 	}, [isOpen, project]);
 
@@ -104,9 +108,9 @@ const ProjectDetailModal = ({ project, isOpen, onClose }) => {
 							</div>
 
 							<div className="flex-1 overflow-y-auto">
-								<div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-8 h-full">
+								<div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-8">
 									{/* Left: Project Details */}
-									<div className="p-6 lg:border-r border-gray-100 bg-gray-50 overflow-y-auto">
+									<div className="p-6 lg:border-r border-gray-100 bg-gray-50">
 										<div className="rounded-xl overflow-hidden shadow-sm border border-gray-200 mb-6 bg-white">
 											{project.imageUrl ? (
 												<img src={project.imageUrl} alt={project.title} className="w-full h-auto object-cover" />
@@ -155,13 +159,15 @@ const ProjectDetailModal = ({ project, isOpen, onClose }) => {
 									</div>
 
 									{/* Right: Comments */}
-									<div className="p-6 flex flex-col h-full bg-white">
-										<h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-											댓글 <span className="text-kakao-yellow">{comments.length}</span>
-										</h3>
+									<div className="flex flex-col bg-white">
+										<div className="p-6 pb-0">
+											<h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+												댓글 <span className="text-kakao-yellow">{comments.length}</span>
+											</h3>
+										</div>
 
 										{/* Comment List */}
-										<div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-2">
+										<div className="px-6 space-y-4 mb-4">
 											{comments.length === 0 ? (
 												<div className="text-center text-gray-400 py-12">
 													첫 번째 댓글을 남겨주세요! 👋
@@ -190,43 +196,45 @@ const ProjectDetailModal = ({ project, isOpen, onClose }) => {
 										</div>
 
 										{/* Comment Form */}
-										<form onSubmit={handleCommentSubmit} className="mt-auto pt-4 border-t border-gray-100">
-											<div className="grid grid-cols-2 gap-2 mb-2">
-												<input
-													type="text"
-													placeholder="작성자 이름"
-													value={authorName}
-													onChange={(e) => setAuthorName(e.target.value)}
-													required
-													className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
-												/>
-												<input
-													type="password"
-													placeholder="비밀번호 (삭제용)"
-													value={password}
-													onChange={(e) => setPassword(e.target.value)}
-													required
-													className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
-												/>
-											</div>
-											<div className="flex gap-2">
-												<input
-													type="text"
-													placeholder="응원의 댓글을 남겨주세요! (비속어 금지)"
-													value={newComment}
-													onChange={(e) => setNewComment(e.target.value)}
-													required
-													className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
-												/>
-												<button
-													type="submit"
-													disabled={isSubmitting}
-													className="bg-kakao-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
-												>
-													<Send className="w-4 h-4" />
-												</button>
-											</div>
-										</form>
+										<div className="p-6 pt-4 border-t border-gray-100 mt-auto">
+											<form onSubmit={handleCommentSubmit}>
+												<div className="grid grid-cols-2 gap-2 mb-2">
+													<input
+														type="text"
+														placeholder="작성자 이름"
+														value={authorName}
+														onChange={(e) => setAuthorName(e.target.value)}
+														required
+														className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+													/>
+													<input
+														type="password"
+														placeholder="비밀번호 (삭제용)"
+														value={password}
+														onChange={(e) => setPassword(e.target.value)}
+														required
+														className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+													/>
+												</div>
+												<div className="flex gap-2">
+													<input
+														type="text"
+														placeholder="응원의 댓글을 남겨주세요! (비속어 금지)"
+														value={newComment}
+														onChange={(e) => setNewComment(e.target.value)}
+														required
+														className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+													/>
+													<button
+														type="submit"
+														disabled={isSubmitting}
+														className="bg-kakao-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+													>
+														<Send className="w-4 h-4" />
+													</button>
+												</div>
+											</form>
+										</div>
 									</div>
 								</div>
 							</div>

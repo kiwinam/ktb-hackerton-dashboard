@@ -21,6 +21,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 	// Reset or populate form when opening/closing
 	useEffect(() => {
 		if (isOpen) {
+			document.body.style.overflow = 'hidden';
 			if (initialData) {
 				setFormData({
 					title: initialData.title || '',
@@ -46,6 +47,10 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 				setTagInput('');
 			}
 		}
+
+		return () => {
+			document.body.style.overflow = 'unset';
+		};
 	}, [isOpen, initialData]);
 
 	const handleChange = (e) => {
@@ -57,6 +62,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 
 	const handleTagKeyDown = (e) => {
 		if (e.key === 'Enter') {
+			if (e.nativeEvent.isComposing) return; // Prevent IME duplicate trigger
 			e.preventDefault();
 			const newTag = tagInput.trim();
 			if (newTag && formData.tags.length < 3 && !formData.tags.includes(newTag)) {
@@ -173,7 +179,8 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 												value={formData.team}
 												onChange={handleChange}
 												className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
-												placeholder="1조"
+												placeholder="1조 (최대 20자)"
+												maxLength={20}
 											/>
 										</div>
 										<div>
@@ -249,7 +256,8 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 											value={formData.title}
 											onChange={handleChange}
 											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
-											placeholder="프로젝트 이름을 입력하세요"
+											placeholder="프로젝트 이름을 입력하세요 (최대 20자)"
+											maxLength={20}
 										/>
 									</div>
 
@@ -257,14 +265,14 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 										<label className="block text-sm font-medium text-gray-700 mb-1">
 											한줄 소개 *
 										</label>
-										<input
-											type="text"
+										<textarea
 											name="description"
 											required
 											value={formData.description}
 											onChange={handleChange}
-											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
-											placeholder="어떤 서비스인가요?"
+											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all resize-none h-24"
+											placeholder="어떤 서비스인가요? (최대 300자)"
+											maxLength={300}
 										/>
 									</div>
 

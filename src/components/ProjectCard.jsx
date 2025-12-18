@@ -62,7 +62,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.3 }}
 			onClick={onClick}
-			className="bg-white rounded-xl shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-[480px] group relative cursor-pointer ring-1 ring-gray-100 hover:ring-kakao-yellow/50"
+			className="bg-white rounded-xl shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-[480px] group relative cursor-pointer ring-1 ring-gray-100"
 		>
 			<div className="relative h-44 overflow-hidden bg-gray-100 flex-shrink-0">
 				{project.imageUrl ? (
