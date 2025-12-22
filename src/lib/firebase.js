@@ -159,6 +159,52 @@ export const deleteComment = async (projectId, commentId, password) => {
 	}
 };
 
+export const updateComment = async (projectId, commentId, password, newContent) => {
+	try {
+		const commentRef = doc(db, COLLECTION_NAME, projectId, "comments", commentId);
+		const commentSnap = await getDoc(commentRef);
+
+		if (commentSnap.exists()) {
+			const data = commentSnap.data();
+			if (data.password === password) {
+				await updateDoc(commentRef, {
+					content: newContent,
+					updatedAt: serverTimestamp()
+				});
+				return { success: true };
+			} else {
+				return { success: false, error: "Incorrect password" };
+			}
+		} else {
+			return { success: false, error: "Comment not found" };
+		}
+	} catch (error) {
+		console.error("Error updating comment: ", error);
+		return { success: false, error };
+	}
+};
+
+export const verifyCommentPassword = async (projectId, commentId, password) => {
+	try {
+		const commentRef = doc(db, COLLECTION_NAME, projectId, "comments", commentId);
+		const commentSnap = await getDoc(commentRef);
+
+		if (commentSnap.exists()) {
+			const data = commentSnap.data();
+			if (data.password === password) {
+				return { success: true };
+			} else {
+				return { success: false, error: "Incorrect password" };
+			}
+		} else {
+			return { success: false, error: "Comment not found" };
+		}
+	} catch (error) {
+		console.error("Error verifying password: ", error);
+		return { success: false, error };
+	}
+};
+
 export const syncCommentCounts = async () => {
 	try {
 		const projectsQuery = query(collection(db, COLLECTION_NAME));

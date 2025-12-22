@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { X, Send, Trash2, Calendar, User } from 'lucide-react';
+import { X, Send, Trash2, Calendar, User, Edit2, Check, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { addComment, subscribeToComments, deleteComment } from '../lib/firebase';
+import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword } from '../lib/firebase';
 import PasswordModal from './PasswordModal';
 
 const BAD_WORDS = ['바보', '멍청이', '씨발', '개새끼', '병신', '지랄', 'fuck', 'shit']; // Simple Profanity Filter - Add more if needed
@@ -15,7 +15,13 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 	const [authorName, setAuthorName] = useState('');
 	const [password, setPassword] = useState('');
 	const [deleteTargetId, setDeleteTargetId] = useState(null);
+	const [editTargetId, setEditTargetId] = useState(null); // ID of comment being edited (password verified)
+	const [editingId, setEditingId] = useState(null); // ID of comment currently being edited (inline)
+	const [editContent, setEditContent] = useState('');
+	const [editPassword, setEditPassword] = useState('');
+
 	const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+	const [passwordModalMode, setPasswordModalMode] = useState('delete'); // 'delete' or 'edit'
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	useEffect(() => {
@@ -64,21 +70,77 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 
 	const handleDeleteClick = (commentId) => {
 		setDeleteTargetId(commentId);
+		setPasswordModalMode('delete');
+		setIsPasswordModalOpen(true);
+	};
+
+	const handleEditClick = (commentId) => {
+		setEditTargetId(commentId);
+		setPasswordModalMode('edit');
 		setIsPasswordModalOpen(true);
 	};
 
 	const handlePasswordVerify = async (inputPassword) => {
-		const result = await deleteComment(project.id, deleteTargetId, inputPassword);
-		if (result.success) {
-			setIsPasswordModalOpen(false);
-			setDeleteTargetId(null);
-			if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
-			return true;
-		} else {
-			if (showToast) showToast("비밀번호가 일치하지 않습니다.", 'error');
-			return false;
+		if (passwordModalMode === 'delete') {
+			const result = await deleteComment(project.id, deleteTargetId, inputPassword);
+			if (result.success) {
+				setIsPasswordModalOpen(false);
+				setDeleteTargetId(null);
+				if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
+				return true;
+			} else {
+				if (showToast) showToast("비밀번호가 일치하지 않습니다.", 'error');
+				return false;
+			}
+		} else if (passwordModalMode === 'edit') {
+			const result = await verifyCommentPassword(project.id, editTargetId, inputPassword);
+			if (result.success) {
+				setIsPasswordModalOpen(false);
+				setEditPassword(inputPassword);
+
+				const commentToEdit = comments.find(c => c.id === editTargetId);
+				if (commentToEdit) {
+					setEditContent(commentToEdit.content);
+					setEditingId(editTargetId);
+				}
+				setEditTargetId(null);
+				return true;
+			} else {
+				if (showToast) showToast("비밀번호가 일치하지 않습니다.", 'error');
+				return false;
+			}
 		}
 	};
+
+	const handleSaveEdit = async () => {
+		if (!editContent.trim()) return;
+
+		const hasBadWord = BAD_WORDS.some(word => editContent.includes(word));
+		if (hasBadWord) {
+			alert("비속어가 포함된 댓글은 등록할 수 없습니다. 바르고 고운 말을 써주세요! 😊");
+			return;
+		}
+
+		console.log("Updating comment:", editingId);
+		const result = await updateComment(project.id, editingId, editPassword, editContent);
+		if (result.success) {
+			setEditingId(null);
+			setEditPassword('');
+			setEditContent('');
+			if (showToast) showToast("댓글이 수정되었습니다!", 'success');
+		} else {
+			if (showToast) showToast("댓글 수정에 실패했습니다.", 'error');
+		}
+	};
+
+	const handleCancelEdit = () => {
+		setEditingId(null);
+		setEditPassword('');
+		setEditContent('');
+	};
+
+
+
 
 	if (!isOpen || !project) return null;
 
@@ -230,21 +292,68 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 											) : (
 												comments.map((comment) => (
 													<div key={comment.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 group hover:shadow-sm transition-shadow">
-														<div className="flex justify-between items-start mb-2">
-															<div className="flex items-center gap-2">
-																<span className="font-bold text-sm text-gray-900">{comment.author}</span>
-																<span className="text-xs text-gray-400">
-																	{comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleDateString() : '방금 전'}
-																</span>
+														{editingId === comment.id ? (
+															// Inline Edit Mode
+															<div className="space-y-2">
+																<div className="flex items-center justify-between mb-2">
+																	<span className="font-bold text-sm text-gray-900">{comment.author}</span>
+																	<span className="text-xs text-kakao-yellow font-bold">수정 중...</span>
+																</div>
+																<textarea
+																	value={editContent}
+																	onChange={(e) => setEditContent(e.target.value)}
+																	className="w-full p-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+																	rows={3}
+																	maxLength={100}
+																/>
+																<div className="flex justify-end gap-2 mt-2">
+																	<button
+																		onClick={handleCancelEdit}
+																		className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-md transition-colors flex items-center gap-1"
+																	>
+																		<XCircle className="w-3 h-3" /> 취소
+																	</button>
+																	<button
+																		onClick={handleSaveEdit}
+																		className="px-3 py-1.5 text-xs font-bold text-kakao-black bg-kakao-yellow rounded-md hover:bg-yellow-400 transition-colors flex items-center gap-1"
+																	>
+																		<Check className="w-3 h-3" /> 저장
+																	</button>
+																</div>
 															</div>
-															<button
-																onClick={() => handleDeleteClick(comment.id)}
-																className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-															>
-																<Trash2 className="w-4 h-4" />
-															</button>
-														</div>
-														<p className="text-gray-700 text-sm whitespace-pre-wrap break-all">{comment.content}</p>
+														) : (
+															// Normal View Mode
+															<>
+																<div className="flex justify-between items-start mb-2">
+																	<div className="flex items-center gap-2">
+																		<span className="font-bold text-sm text-gray-900">{comment.author}</span>
+																		<span className="text-xs text-gray-400">
+																			{comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleDateString() : '방금 전'}
+																		</span>
+																		{comment.updatedAt && (
+																			<span className="text-xs text-gray-400">(수정됨)</span>
+																		)}
+																	</div>
+																	<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+																		<button
+																			onClick={() => handleEditClick(comment.id)}
+																			className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+																			title="수정"
+																		>
+																			<Edit2 className="w-4 h-4" />
+																		</button>
+																		<button
+																			onClick={() => handleDeleteClick(comment.id)}
+																			className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+																			title="삭제"
+																		>
+																			<Trash2 className="w-4 h-4" />
+																		</button>
+																	</div>
+																</div>
+																<p className="text-gray-700 text-sm whitespace-pre-wrap break-all">{comment.content}</p>
+															</>
+														)}
 													</div>
 												))
 											)}
@@ -259,8 +368,8 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 						isOpen={isPasswordModalOpen}
 						onClose={() => setIsPasswordModalOpen(false)}
 						onVerify={handlePasswordVerify}
-						title="댓글 삭제"
-						description="댓글 작성 시 설정한 비밀번호를 입력해주세요."
+						title={passwordModalMode === 'delete' ? "댓글 삭제" : "댓글 수정"}
+						description={passwordModalMode === 'delete' ? "삭제하려면 비밀번호를 입력하세요." : "수정하려면 비밀번호를 입력하세요."}
 					/>
 				</>
 			)}

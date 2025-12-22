@@ -58,9 +58,12 @@ const PasswordModal = ({ isOpen, onClose, onVerify }) => {
 									type="password"
 									autoFocus
 									maxLength={4}
+									inputMode="numeric"
+									pattern="[0-9]*"
 									value={password}
 									onChange={(e) => {
-										setPassword(e.target.value);
+										const val = e.target.value.replace(/[^0-9]/g, '');
+										setPassword(val);
 										setError(false);
 									}}
 									className={`w-full text-center text-2xl tracking-[0.5em] px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all font-mono ${error
