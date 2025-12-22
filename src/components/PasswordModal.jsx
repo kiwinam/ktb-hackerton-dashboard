@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock } from 'lucide-react';
 
-const PasswordModal = ({ isOpen, onClose, onVerify }) => {
+const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인", description = "비밀번호를 입력해주세요." }) => {
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState(false);
 
@@ -40,7 +40,7 @@ const PasswordModal = ({ isOpen, onClose, onVerify }) => {
 							<div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
 								<h3 className="font-bold text-gray-900 flex items-center gap-2">
 									<Lock className="w-4 h-4" />
-									비밀번호 확인
+									{title}
 								</h3>
 								<button
 									onClick={onClose}
@@ -52,7 +52,7 @@ const PasswordModal = ({ isOpen, onClose, onVerify }) => {
 
 							<form onSubmit={handleSubmit} className="p-6">
 								<p className="text-sm text-gray-600 mb-4">
-									프로젝트를 수정하려면 등록할 때 설정한 비밀번호 4자리를 입력해주세요.
+									{description}
 								</p>
 
 								<input
