@@ -130,6 +130,7 @@ function App() {
         project={selectedProject}
         isOpen={!!selectedProject}
         onClose={() => setSelectedProject(null)}
+        onCommentSuccess={(msg) => showToast(msg)}
       />
 
       <RegisterModal

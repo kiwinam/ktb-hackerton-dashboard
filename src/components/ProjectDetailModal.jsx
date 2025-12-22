@@ -9,7 +9,7 @@ import PasswordModal from './PasswordModal';
 
 const BAD_WORDS = ['바보', '멍청이', '씨발', '개새끼', '병신', '지랄', 'fuck', 'shit']; // Simple Profanity Filter - Add more if needed
 
-const ProjectDetailModal = ({ project, isOpen, onClose }) => {
+const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess }) => {
 	const [comments, setComments] = useState([]);
 	const [newComment, setNewComment] = useState('');
 	const [authorName, setAuthorName] = useState('');
@@ -56,6 +56,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose }) => {
 			// Let's keep author name, clear password for security habit, though for hackathon convenience maybe keep?
 			// Clearing password is safer.
 			setPassword('');
+			if (onCommentSuccess) onCommentSuccess("댓글이 등록되었습니다!");
 		} else {
 			alert("댓글 등록에 실패했습니다.");
 		}
