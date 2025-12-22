@@ -108,21 +108,34 @@ function App() {
 
 
 
-  const sortedProjects = [...projects].sort((a, b) => {
-    if (sortBy === 'likes') {
-      const likesA = a.likes || 0;
-      const likesB = b.likes || 0;
-      if (likesA !== likesB) return likesB - likesA;
-    }
-    // Default to latest (createdAt)
-    const dateA = a.createdAt?.seconds || 0;
-    const dateB = b.createdAt?.seconds || 0;
-    return dateB - dateA;
-  });
+  // Generation State
+  const [selectedGeneration, setSelectedGeneration] = useState(3);
+
+  // ... (existing code)
+
+  const sortedProjects = [...projects]
+    .filter(p => (p.generation || 3) === selectedGeneration) // Filter by generation (default to 3)
+    .sort((a, b) => {
+      if (sortBy === 'likes') {
+        const likesA = a.likes || 0;
+        const likesB = b.likes || 0;
+        if (likesA !== likesB) return likesB - likesA;
+      }
+      // Default to latest (createdAt)
+      const dateA = a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.seconds || 0;
+      return dateB - dateA;
+    });
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-200">
-      <Header onRegister={() => setIsModalOpen(true)} theme={theme} toggleTheme={toggleTheme} />
+      <Header
+        onRegister={() => setIsModalOpen(true)}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        selectedGeneration={selectedGeneration}
+        onSelectGeneration={setSelectedGeneration}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-end mb-6">
@@ -175,6 +188,7 @@ function App() {
         onClose={handleCloseModal}
         initialData={editingProject}
         onSuccess={(msg) => showToast(msg)}
+        defaultGeneration={selectedGeneration}
       />
 
       <PasswordModal

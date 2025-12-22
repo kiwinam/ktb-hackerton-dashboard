@@ -3,7 +3,7 @@ import { X, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addProject, updateProject } from '../lib/firebase';
 
-const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
+const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, defaultGeneration = 3 }) => {
 	const [loading, setLoading] = useState(false);
 	const [fetchingOg, setFetchingOg] = useState(false);
 	const [formData, setFormData] = useState({
@@ -14,7 +14,8 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 		url: '',
 		imageUrl: '',
 		password: '',
-		tags: []
+		tags: [],
+		generation: defaultGeneration
 	});
 	const [tagInput, setTagInput] = useState('');
 
@@ -31,7 +32,8 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 					url: initialData.url || '',
 					imageUrl: initialData.imageUrl || '',
 					password: initialData.password || '',
-					tags: initialData.tags || []
+					tags: initialData.tags || [],
+					generation: initialData.generation || defaultGeneration // Preserve existing gen or default
 				});
 			} else {
 				setFormData({
@@ -42,7 +44,8 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 					url: '',
 					imageUrl: '',
 					password: '',
-					tags: []
+					tags: [],
+					generation: defaultGeneration
 				});
 				setTagInput('');
 			}
@@ -51,7 +54,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 		return () => {
 			document.body.style.overflow = 'unset';
 		};
-	}, [isOpen, initialData]);
+	}, [isOpen, initialData, defaultGeneration]);
 
 	const handleChange = (e) => {
 		setFormData({
