@@ -18,6 +18,32 @@ function App() {
   const [projects, setProjects] = useState([]);
   // Initialize from localStorage or default to 'latest'
   const [sortBy, setSortBy] = useState(() => localStorage.getItem('project_sort_order') || 'latest');
+
+  // Theme State
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme) return savedTheme;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  });
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [theme]);
+
   const [loading, setLoading] = useState(true);
 
   // Save sort preference when changed
@@ -95,17 +121,17 @@ function App() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      <Header onRegister={() => setIsModalOpen(true)} />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-200">
+      <Header onRegister={() => setIsModalOpen(true)} theme={theme} toggleTheme={toggleTheme} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-end mb-6">
-          <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex shadow-sm items-center">
+          <div className="bg-white dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 inline-flex shadow-sm items-center transition-colors">
             <button
               onClick={() => setSortBy('latest')}
               className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${sortBy === 'latest'
                 ? 'bg-kakao-yellow text-kakao-black shadow-sm'
-                : 'text-gray-500 hover:bg-gray-50'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
             >
               등록순
@@ -114,7 +140,7 @@ function App() {
               onClick={() => setSortBy('likes')}
               className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${sortBy === 'likes'
                 ? 'bg-kakao-yellow text-kakao-black shadow-sm'
-                : 'text-gray-500 hover:bg-gray-50'
+                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
             >
               좋아요순

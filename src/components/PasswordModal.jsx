@@ -38,9 +38,9 @@ const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인
 						exit={{ opacity: 0, scale: 0.95 }}
 						className="fixed inset-0 z-[70] flex items-center justify-center p-4 pointer-events-none"
 					>
-						<div className="bg-white rounded-2xl w-full max-w-sm shadow-xl pointer-events-auto overflow-hidden">
-							<div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-								<h3 className="font-bold text-gray-900 flex items-center gap-2">
+						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm shadow-xl pointer-events-auto overflow-hidden">
+							<div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+								<h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
 									<Lock className="w-4 h-4" />
 									{title}
 								</h3>
@@ -53,7 +53,7 @@ const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인
 							</div>
 
 							<form onSubmit={handleSubmit} className="p-6">
-								<p className="text-sm text-gray-600 mb-4">
+								<p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
 									{description}
 								</p>
 
@@ -69,9 +69,9 @@ const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인
 										setPassword(val);
 										setError(null);
 									}}
-									className={`w-full text-center text-2xl tracking-[0.5em] px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all font-mono ${error
-										? 'border-red-300 focus:ring-red-200 bg-red-50'
-										: 'border-gray-300 focus:ring-kakao-yellow focus:border-transparent'
+									className={`w-full text-center text-2xl tracking-[0.5em] px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all font-mono bg-white dark:bg-gray-900 dark:text-white ${error
+										? 'border-red-300 dark:border-red-500/50 focus:ring-red-200 dark:focus:ring-red-900/30 bg-red-50 dark:bg-red-900/10'
+										: 'border-gray-300 dark:border-gray-600 focus:ring-kakao-yellow focus:border-transparent'
 										}`}
 									placeholder="******"
 									autoComplete="new-password"
@@ -85,7 +85,7 @@ const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인
 
 								<button
 									type="submit"
-									className="w-full mt-6 bg-kakao-black text-white py-3 rounded-lg font-bold hover:bg-black transition-colors"
+									className="w-full mt-6 bg-kakao-black dark:bg-white text-white dark:text-kakao-black py-3 rounded-lg font-bold hover:bg-black dark:hover:bg-gray-100 transition-colors"
 								>
 									확인
 								</button>

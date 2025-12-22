@@ -20,9 +20,9 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, description, confirmT
 						exit={{ opacity: 0, scale: 0.95 }}
 						className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none"
 					>
-						<div className="bg-white rounded-2xl w-full max-w-sm shadow-xl pointer-events-auto overflow-hidden">
-							<div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-								<h3 className={`font-bold flex items-center gap-2 ${isDangerous ? 'text-red-600' : 'text-gray-900'}`}>
+						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm shadow-xl pointer-events-auto overflow-hidden">
+							<div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+								<h3 className={`font-bold flex items-center gap-2 ${isDangerous ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
 									<AlertCircle className="w-5 h-5" />
 									{title}
 								</h3>
@@ -35,14 +35,14 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, description, confirmT
 							</div>
 
 							<div className="p-6">
-								<p className="text-gray-600 mb-8 whitespace-pre-wrap">
+								<p className="text-gray-600 dark:text-gray-300 mb-8 whitespace-pre-wrap">
 									{description}
 								</p>
 
 								<div className="flex gap-3">
 									<button
 										onClick={onClose}
-										className="flex-1 py-3 border border-gray-200 rounded-lg font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+										className="flex-1 py-3 border border-gray-200 dark:border-gray-600 rounded-lg font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
 									>
 										{cancelText}
 									</button>
@@ -53,7 +53,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, description, confirmT
 										}}
 										className={`flex-1 py-3 rounded-lg font-bold text-white transition-colors ${isDangerous
 												? 'bg-red-500 hover:bg-red-600'
-												: 'bg-kakao-black hover:bg-gray-800'
+												: 'bg-kakao-black hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200'
 											}`}
 									>
 										{confirmText}

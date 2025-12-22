@@ -180,15 +180,15 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 						exit={{ opacity: 0, scale: 0.95, y: 20 }}
 						className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
 					>
-						<div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh] overflow-hidden">
+						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-4xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh] overflow-hidden">
 							{/* Header */}
-							<div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
-								<h2 className="text-xl font-bold text-gray-900 truncate pr-4">
+							<div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 z-10">
+								<h2 className="text-xl font-bold text-gray-900 dark:text-white truncate pr-4">
 									{project.title}
 								</h2>
 								<button
 									onClick={onClose}
-									className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+									className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400"
 								>
 									<X className="w-6 h-6" />
 								</button>
@@ -197,12 +197,12 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 							<div className="flex-1 overflow-y-auto">
 								<div className="flex flex-col">
 									{/* Top: Project Details */}
-									<div className="p-6 border-b border-gray-100 bg-gray-50">
-										<div className="rounded-xl overflow-hidden shadow-sm border border-gray-200 mb-6 bg-white">
+									<div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+										<div className="rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700 mb-6 bg-white dark:bg-gray-800">
 											{project.imageUrl ? (
 												<img src={project.imageUrl} alt={project.title} className="w-full h-auto object-cover max-h-[400px]" />
 											) : (
-												<div className="aspect-video flex items-center justify-center bg-gray-100 text-gray-400">
+												<div className="aspect-video flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500">
 													이미지 없음
 												</div>
 											)}
@@ -215,23 +215,23 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 												</span>
 											)}
 											{project.tags && project.tags.map((tag, i) => (
-												<span key={i} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium border border-blue-200">
+												<span key={i} className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium border border-blue-200 dark:border-blue-800">
 													#{tag}
 												</span>
 											))}
 										</div>
 
-										<div className="prose prose-sm max-w-none text-gray-700 leading-relaxed mb-8 break-keep">
+										<div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed mb-8 break-keep">
 											<ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{project.description}</ReactMarkdown>
 										</div>
 
-										<div className="bg-white p-4 rounded-xl border border-gray-200">
-											<h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+										<div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+											<h4 className="font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
 												<User className="w-4 h-4" /> 팀원
 											</h4>
 											<div className="flex flex-wrap gap-2">
 												{project.members && project.members.map((m, i) => (
-													<span key={i} className="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
+													<span key={i} className="text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
 														{m}
 													</span>
 												))}
@@ -246,16 +246,16 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 									</div>
 
 									{/* Bottom: Comments */}
-									<div className="flex flex-col bg-white">
+									<div className="flex flex-col bg-white dark:bg-gray-800">
 										<div className="p-6 pb-0">
-											<h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+											<h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
 												댓글 <span className="text-kakao-yellow">{comments.length}</span>
 											</h3>
 										</div>
 
 										{/* Comment Form (Moved to Top) */}
 										<div className="px-6 pb-6">
-											<form onSubmit={handleCommentSubmit} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+											<form onSubmit={handleCommentSubmit} className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
 												<div className="grid grid-cols-2 gap-2 mb-2">
 													<input
 														type="text"
@@ -263,7 +263,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 														value={authorName}
 														onChange={(e) => setAuthorName(e.target.value)}
 														required
-														className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+														className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
 													/>
 													<input
 														type="password"
@@ -278,7 +278,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 														inputMode="numeric"
 														pattern="[0-9]*"
 														autoComplete="new-password"
-														className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+														className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
 													/>
 												</div>
 												<div className="flex gap-2">
@@ -289,7 +289,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 														onChange={(e) => setNewComment(e.target.value)}
 														required
 														maxLength={100}
-														className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+														className="flex-1 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
 													/>
 													<button
 														type="submit"
@@ -305,12 +305,12 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 										{/* Comment List */}
 										<div className="px-6 space-y-4 mb-8">
 											{comments.length === 0 ? (
-												<div className="text-center text-gray-400 py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+												<div className="text-center text-gray-400 dark:text-gray-500 py-8 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
 													첫 번째 댓글을 남겨주세요! 👋
 												</div>
 											) : (
 												comments.map((comment) => (
-													<div key={comment.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 group hover:shadow-sm transition-shadow">
+													<div key={comment.id} className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 group hover:shadow-sm transition-shadow">
 														{editingId === comment.id ? (
 															// Inline Edit Mode
 															<div className="space-y-2">
@@ -321,14 +321,14 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 																<textarea
 																	value={editContent}
 																	onChange={(e) => setEditContent(e.target.value)}
-																	className="w-full p-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+																	className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
 																	rows={3}
 																	maxLength={100}
 																/>
 																<div className="flex justify-end gap-2 mt-2">
 																	<button
 																		onClick={handleCancelEdit}
-																		className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-md transition-colors flex items-center gap-1"
+																		className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md transition-colors flex items-center gap-1"
 																	>
 																		<XCircle className="w-3 h-3" /> 취소
 																	</button>
@@ -345,8 +345,8 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 															<>
 																<div className="flex justify-between items-start mb-2">
 																	<div className="flex items-center gap-2">
-																		<span className="font-bold text-sm text-gray-900">{comment.author}</span>
-																		<span className="text-xs text-gray-400">
+																		<span className="font-bold text-sm text-gray-900 dark:text-white">{comment.author}</span>
+																		<span className="text-xs text-gray-400 dark:text-gray-500">
 																			{comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleDateString() : '방금 전'}
 																		</span>
 																		{comment.updatedAt && (
@@ -370,7 +370,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 																		</button>
 																	</div>
 																</div>
-																<p className="text-gray-700 text-sm whitespace-pre-wrap break-all">{comment.content}</p>
+																<p className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap break-all">{comment.content}</p>
 															</>
 														)}
 													</div>
@@ -401,8 +401,9 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 						isDangerous={true}
 					/>
 				</>
-			)}
-		</AnimatePresence>
+			)
+			}
+		</AnimatePresence >
 	);
 };
 

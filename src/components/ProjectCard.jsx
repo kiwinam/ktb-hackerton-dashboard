@@ -62,9 +62,9 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.3 }}
 			onClick={onClick}
-			className="bg-white rounded-xl shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-[480px] group relative cursor-pointer ring-1 ring-gray-100"
+			className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col h-[480px] group relative cursor-pointer ring-1 ring-gray-100 dark:ring-gray-700"
 		>
-			<div className="relative h-44 overflow-hidden bg-gray-100 flex-shrink-0">
+			<div className="relative h-44 overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
 				{project.imageUrl ? (
 					<img
 						src={project.imageUrl}
@@ -75,7 +75,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 						}}
 					/>
 				) : (
-					<div className="w-full h-full flex items-center justify-center text-gray-400">
+					<div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
 						<span className="text-sm">이미지 준비중</span>
 					</div>
 				)}
@@ -110,18 +110,18 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 				</div>
 
 				{/* Members - Force 1 line */}
-				<div className="h-5 mb-2 overflow-hidden text-xs text-gray-500 flex flex-nowrap gap-1 items-center">
+				<div className="h-5 mb-2 overflow-hidden text-xs text-gray-500 dark:text-gray-400 flex flex-nowrap gap-1 items-center">
 					{project.members && project.members.map((member, idx) => (
-						<span key={idx} className="bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+						<span key={idx} className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded whitespace-nowrap">
 							{member}
 						</span>
 					))}
 				</div>
 
-				<h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-1 group-hover:text-kakao-black transition-colors">
+				<h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-kakao-black dark:group-hover:text-kakao-yellow transition-colors">
 					{project.title}
 				</h3>
-				<p className="text-gray-600 text-sm mb-auto line-clamp-1 h-5">
+				<p className="text-gray-600 dark:text-gray-400 text-sm mb-auto line-clamp-1 h-5">
 					{project.description}
 				</p>
 
@@ -130,15 +130,15 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 						<button
 							onClick={handleLike}
 							className={`flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-lg text-sm font-bold transition-all border ${isLiked
-								? 'bg-red-50 text-red-500 border-red-100'
-								: 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+								? 'bg-red-50 dark:bg-red-900/20 text-red-500 border-red-100 dark:border-red-900/30'
+								: 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
 								}`}
 						>
 							<Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
 							<span>{project.likes || 0}</span>
 						</button>
 
-						<div className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-lg text-sm font-bold bg-white text-gray-500 border border-gray-200">
+						<div className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-lg text-sm font-bold bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
 							<MessageCircle className="w-4 h-4" />
 							<span>{commentCount}</span>
 						</div>
@@ -149,7 +149,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 						target="_blank"
 						rel="noopener noreferrer"
 						onClick={(e) => e.stopPropagation()}
-						className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-gray-50 hover:bg-kakao-yellow hover:text-kakao-black text-gray-700 rounded-lg text-sm font-bold transition-colors"
+						className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-gray-50 dark:bg-gray-700 hover:bg-kakao-yellow dark:hover:bg-kakao-yellow hover:text-kakao-black dark:text-gray-300 dark:hover:text-kakao-black text-gray-700 rounded-lg text-sm font-bold transition-colors"
 					>
 						<span>보러가기</span>
 						<ExternalLink className="w-4 h-4" />

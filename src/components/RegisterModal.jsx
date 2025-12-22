@@ -152,14 +152,14 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 						exit={{ opacity: 0, scale: 0.95, y: 20 }}
 						className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
 					>
-						<div className="bg-white rounded-2xl w-full max-w-lg shadow-xl pointer-events-auto flex flex-col max-h-[90vh]">
-							<div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 flex-shrink-0">
-								<h2 className="text-xl font-bold text-gray-900">
+						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg shadow-xl pointer-events-auto flex flex-col max-h-[90vh]">
+							<div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 flex-shrink-0">
+								<h2 className="text-xl font-bold text-gray-900 dark:text-white">
 									{initialData ? '프로젝트 수정' : '새 프로젝트 등록'}
 								</h2>
 								<button
 									onClick={onClose}
-									className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+									className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400"
 								>
 									<X className="w-5 h-5" />
 								</button>
@@ -169,7 +169,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 								<form id="project-form" onSubmit={handleSubmit} className="space-y-4">
 									<div className="grid grid-cols-2 gap-4">
 										<div>
-											<label className="block text-sm font-medium text-gray-700 mb-1">
+											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 												팀 이름 (예: 1조) *
 											</label>
 											<input
@@ -178,13 +178,13 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 												required
 												value={formData.team}
 												onChange={handleChange}
-												className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
+												className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 												placeholder="1조 (최대 20자)"
 												maxLength={20}
 											/>
 										</div>
 										<div>
-											<label className="block text-sm font-medium text-gray-700 mb-1">
+											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 												비밀번호{initialData && ' (수정 불가)'} *
 											</label>
 											<input
@@ -196,14 +196,14 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 												value={formData.password}
 												onChange={handleChange}
 												autoComplete="new-password"
-												className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+												className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 												placeholder="숫자 4~6자리"
 											/>
 										</div>
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 											팀원 이름 (콤마로 구분) *
 										</label>
 										<input
@@ -212,13 +212,13 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 											required
 											value={formData.members}
 											onChange={handleChange}
-											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
+											className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 											placeholder="김철수, 이영희, 박지성"
 										/>
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 											프로젝트 태그 (최대 3개)
 										</label>
 										<div className="flex flex-wrap gap-2 mb-2">
@@ -241,13 +241,13 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 											onChange={(e) => setTagInput(e.target.value)}
 											onKeyDown={handleTagKeyDown}
 											disabled={formData.tags.length >= 3}
-											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all disabled:bg-gray-50 disabled:placeholder-gray-400"
+											className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:placeholder-gray-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 											placeholder={formData.tags.length >= 3 ? "태그는 3개까지만 가능합니다" : "태그 입력 후 엔터"}
 										/>
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 											프로젝트 이름 *
 										</label>
 										<input
@@ -256,14 +256,14 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 											required
 											value={formData.title}
 											onChange={handleChange}
-											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
+											className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 											placeholder="프로젝트 이름을 입력하세요 (최대 20자)"
 											maxLength={20}
 										/>
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 											상세 소개 (Markdown 지원) *
 										</label>
 										<textarea
@@ -271,14 +271,14 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 											required
 											value={formData.description}
 											onChange={handleChange}
-											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all resize-none h-48 font-mono text-sm"
+											className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all resize-none h-48 font-mono text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 											placeholder="프로젝트에 대해 자세히 설명해주세요. 마크다운 문법을 지원합니다. (최대 3000자)"
 											maxLength={3000}
 										/>
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 											서비스 URL *
 										</label>
 										<div className="flex space-x-2">
@@ -288,14 +288,14 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 												required
 												value={formData.url}
 												onChange={handleChange}
-												className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
+												className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 												placeholder="https://example.com"
 											/>
 											<button
 												type="button"
 												onClick={fetchOgImage}
 												disabled={fetchingOg || !formData.url}
-												className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center space-x-1 whitespace-nowrap"
+												className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 flex items-center space-x-1 whitespace-nowrap"
 												title="URL에서 이미지 자동 가져오기"
 											>
 												{fetchingOg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
@@ -305,7 +305,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 									</div>
 
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1">
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 											이미지 URL
 										</label>
 										<input
@@ -313,7 +313,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 											name="imageUrl"
 											value={formData.imageUrl}
 											onChange={handleChange}
-											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all"
+											className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 											placeholder="자동으로 가져오거나 직접 입력하세요"
 										/>
 										{formData.imageUrl && (
@@ -326,7 +326,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 								</form>
 							</div>
 
-							<div className="p-6 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+							<div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 flex-shrink-0">
 								<button
 									type="submit"
 									form="project-form"
