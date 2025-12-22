@@ -417,12 +417,15 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 												<h4 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">새 버전 기록 추가</h4>
 												<div className="space-y-3">
 													<div>
-														<label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">버전 & 날짜</label>
+														<label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">버전</label>
 														<input
 															type="text"
 															value={newVersion}
-															onChange={(e) => setNewVersion(e.target.value)}
-															placeholder="예: 1.0.0"
+															onChange={(e) => {
+																const val = e.target.value.replace(/[^0-9.]/g, ''); // Allow only numbers and dots
+																setNewVersion(val);
+															}}
+															placeholder="Example: 1.0.0"
 															className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
 														/>
 														<p className="text-[10px] text-gray-400 mt-1">Major.Minor.Patch 형식 (예: 1.0.0)</p>
@@ -479,7 +482,10 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 																	<input
 																		type="text"
 																		value={editVersion}
-																		onChange={(e) => setEditVersion(e.target.value)}
+																		onChange={(e) => {
+																			const val = e.target.value.replace(/[^0-9.]/g, '');
+																			setEditVersion(val);
+																		}}
 																		className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
 																	/>
 																</div>

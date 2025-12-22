@@ -67,7 +67,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.3 }}
 			onClick={onClick}
-			className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col h-[480px] group relative cursor-pointer ring-1 ring-gray-100 dark:ring-gray-700"
+			className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 dark:border-gray-700 flex flex-col h-[430px] group relative cursor-pointer ring-1 ring-gray-100 dark:ring-gray-700"
 		>
 			<div className="relative h-44 overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
 				{project.imageUrl ? (
@@ -90,14 +90,14 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 				<div className="absolute top-3 left-3 flex items-center gap-2 max-w-[calc(100%-3rem)]">
 					{/* Team Badge */}
 					{project.team && (
-						<div className="bg-kakao-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg truncate min-w-0 flex-shrink" title={project.team}>
+						<div className="bg-kakao-black/80 text-white text-xs font-bold px-2.5 h-6 rounded-md backdrop-blur-sm border border-white/10 shadow-lg truncate min-w-0 flex-shrink flex items-center" title={project.team}>
 							{project.team}
 						</div>
 					)}
 
 					{/* Latest Version Badge */}
 					{project.latestVersion && (
-						<div className="bg-green-500/90 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg flex items-center gap-1 flex-shrink-0">
+						<div className="bg-green-500/90 text-white text-xs font-bold px-2.5 h-6 rounded-md backdrop-blur-sm border border-white/10 shadow-lg flex items-center gap-1 flex-shrink-0">
 							🚀 {project.latestVersion}
 						</div>
 					)}
@@ -113,7 +113,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 				</button>
 			</div>
 
-			<div className="p-5 flex-1 flex flex-col overflow-hidden relative">
+			<div className="p-4 flex-1 flex flex-col overflow-hidden relative">
 				{/* Tags - Truncate long tags */}
 				<div className="h-6 mb-2 overflow-hidden flex flex-wrap gap-1.5">
 					{project.tags && project.tags.map((tag, idx) => (
@@ -139,7 +139,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 					{project.description}
 				</p>
 
-				<div className="mt-auto w-full flex flex-col gap-3">
+				<div className="mt-auto w-full flex flex-col gap-2">
 					<div className="flex items-center gap-2">
 						<button
 							onClick={handleLike}
