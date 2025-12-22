@@ -114,12 +114,12 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 							</div>
 
 							<div className="flex-1 overflow-y-auto">
-								<div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-8">
-									{/* Left: Project Details */}
-									<div className="p-6 lg:border-r border-gray-100 bg-gray-50">
+								<div className="flex flex-col">
+									{/* Top: Project Details */}
+									<div className="p-6 border-b border-gray-100 bg-gray-50">
 										<div className="rounded-xl overflow-hidden shadow-sm border border-gray-200 mb-6 bg-white">
 											{project.imageUrl ? (
-												<img src={project.imageUrl} alt={project.title} className="w-full h-auto object-cover" />
+												<img src={project.imageUrl} alt={project.title} className="w-full h-auto object-cover max-h-[400px]" />
 											) : (
 												<div className="aspect-video flex items-center justify-center bg-gray-100 text-gray-400">
 													이미지 없음
@@ -164,7 +164,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 										</div>
 									</div>
 
-									{/* Right: Comments */}
+									{/* Bottom: Comments */}
 									<div className="flex flex-col bg-white">
 										<div className="p-6 pb-0">
 											<h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -172,38 +172,9 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 											</h3>
 										</div>
 
-										{/* Comment List */}
-										<div className="px-6 space-y-4 mb-4">
-											{comments.length === 0 ? (
-												<div className="text-center text-gray-400 py-12">
-													첫 번째 댓글을 남겨주세요! 👋
-												</div>
-											) : (
-												comments.map((comment) => (
-													<div key={comment.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 group">
-														<div className="flex justify-between items-start mb-2">
-															<div className="flex items-center gap-2">
-																<span className="font-bold text-sm text-gray-900">{comment.author}</span>
-																<span className="text-xs text-gray-400">
-																	{comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleDateString() : '방금 전'}
-																</span>
-															</div>
-															<button
-																onClick={() => handleDeleteClick(comment.id)}
-																className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-															>
-																<Trash2 className="w-4 h-4" />
-															</button>
-														</div>
-														<p className="text-gray-700 text-sm whitespace-pre-wrap">{comment.content}</p>
-													</div>
-												))
-											)}
-										</div>
-
-										{/* Comment Form */}
-										<div className="p-6 pt-4 border-t border-gray-100 mt-auto">
-											<form onSubmit={handleCommentSubmit}>
+										{/* Comment Form (Moved to Top) */}
+										<div className="px-6 pb-6">
+											<form onSubmit={handleCommentSubmit} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
 												<div className="grid grid-cols-2 gap-2 mb-2">
 													<input
 														type="text"
@@ -211,7 +182,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 														value={authorName}
 														onChange={(e) => setAuthorName(e.target.value)}
 														required
-														className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+														className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
 													/>
 													<input
 														type="password"
@@ -226,7 +197,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 														inputMode="numeric"
 														pattern="[0-9]*"
 														autoComplete="new-password"
-														className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+														className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
 													/>
 												</div>
 												<div className="flex gap-2">
@@ -237,7 +208,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 														onChange={(e) => setNewComment(e.target.value)}
 														required
 														maxLength={100}
-														className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
+														className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
 													/>
 													<button
 														type="submit"
@@ -248,6 +219,35 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 													</button>
 												</div>
 											</form>
+										</div>
+
+										{/* Comment List */}
+										<div className="px-6 space-y-4 mb-8">
+											{comments.length === 0 ? (
+												<div className="text-center text-gray-400 py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+													첫 번째 댓글을 남겨주세요! 👋
+												</div>
+											) : (
+												comments.map((comment) => (
+													<div key={comment.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 group hover:shadow-sm transition-shadow">
+														<div className="flex justify-between items-start mb-2">
+															<div className="flex items-center gap-2">
+																<span className="font-bold text-sm text-gray-900">{comment.author}</span>
+																<span className="text-xs text-gray-400">
+																	{comment.createdAt?.seconds ? new Date(comment.createdAt.seconds * 1000).toLocaleDateString() : '방금 전'}
+																</span>
+															</div>
+															<button
+																onClick={() => handleDeleteClick(comment.id)}
+																className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+															>
+																<Trash2 className="w-4 h-4" />
+															</button>
+														</div>
+														<p className="text-gray-700 text-sm whitespace-pre-wrap break-all">{comment.content}</p>
+													</div>
+												))
+											)}
 										</div>
 									</div>
 								</div>
