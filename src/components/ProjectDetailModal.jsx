@@ -57,6 +57,22 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 		}
 	}, [isOpen, project]);
 
+	// Handle ESC key to close modal
+	useEffect(() => {
+		if (isOpen) {
+			const handleEsc = (e) => {
+				if (e.key === 'Escape') {
+					// Do not close if sub-modals are open
+					if (!isPasswordModalOpen && !isConfirmModalOpen) {
+						onClose();
+					}
+				}
+			};
+			window.addEventListener('keydown', handleEsc);
+			return () => window.removeEventListener('keydown', handleEsc);
+		}
+	}, [isOpen, onClose, isPasswordModalOpen, isConfirmModalOpen]);
+
 	// Subscribe to deployments
 	useEffect(() => {
 		if (isOpen && project) {
