@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowUp } from 'lucide-react';
 import Header from './components/Header';
+import Footer from './components/Footer';
 import ProjectList from './components/ProjectList';
 import RegisterModal from './components/RegisterModal';
 import PasswordModal from './components/PasswordModal';
@@ -128,7 +129,7 @@ function App() {
     });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-200 flex flex-col">
       <Header
         onRegister={() => setIsModalOpen(true)}
         theme={theme}
@@ -137,7 +138,7 @@ function App() {
         onSelectGeneration={setSelectedGeneration}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
         <div className="flex justify-end mb-6">
           <div className="bg-white dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 inline-flex shadow-sm items-center transition-colors">
             <button
@@ -211,6 +212,8 @@ function App() {
 
       {/* Scroll to Top */}
       <ScrollToTop />
+
+      <Footer />
     </div>
   );
 }
