@@ -87,19 +87,21 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 
 				<div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
-				{/* Team Badge */}
-				{project.team && (
-					<div className="absolute top-3 left-3 bg-kakao-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg">
-						{project.team}
-					</div>
-				)}
+				<div className="absolute top-3 left-3 flex items-center gap-2 max-w-[calc(100%-3rem)]">
+					{/* Team Badge */}
+					{project.team && (
+						<div className="bg-kakao-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg truncate min-w-0 flex-shrink" title={project.team}>
+							{project.team}
+						</div>
+					)}
 
-				{/* Latest Version Badge */}
-				{project.latestVersion && (
-					<div className="absolute top-3 left-[calc(3rem+20px)] ml-2 bg-green-500/90 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg flex items-center gap-1">
-						🚀 {project.latestVersion}
-					</div>
-				)}
+					{/* Latest Version Badge */}
+					{project.latestVersion && (
+						<div className="bg-green-500/90 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg flex items-center gap-1 flex-shrink-0">
+							🚀 {project.latestVersion}
+						</div>
+					)}
+				</div>
 
 				{/* Edit Button */}
 				<button
