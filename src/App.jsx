@@ -6,7 +6,7 @@ import RegisterModal from './components/RegisterModal';
 import PasswordModal from './components/PasswordModal';
 import ProjectDetailModal from './components/ProjectDetailModal';
 import Toast from './components/Toast';
-import { subscribeToProjects, migrateLegacyData, verifyProjectPassword } from './lib/firebase';
+import { subscribeToProjects, verifyProjectPassword } from './lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
 
 function App() {
@@ -77,17 +77,7 @@ function App() {
     setToastType(type);
   };
 
-  const handleMigrate = async () => {
-    if (!window.confirm("정말로 데이터 마이그레이션을 진행하시겠습니까? (모든 비밀번호 암호화)")) return;
-    setLoading(true);
-    const result = await migrateLegacyData();
-    setLoading(false);
-    if (result.success) {
-      alert(`마이그레이션 완료!\n프로젝트: ${result.pCount}개\n댓글: ${result.cCount}개`);
-    } else {
-      alert("오류 발생: " + result.error);
-    }
-  };
+
 
   const sortedProjects = [...projects].sort((a, b) => {
     if (sortBy === 'likes') {
@@ -125,12 +115,6 @@ function App() {
                 }`}
             >
               좋아요순
-            </button>
-            <button
-              onClick={handleMigrate}
-              className="ml-2 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50 rounded-md border border-red-200 transition-colors"
-            >
-              DB 마이그레이션
             </button>
           </div>
         </div>
