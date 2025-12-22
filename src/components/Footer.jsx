@@ -11,7 +11,7 @@ const Footer = () => {
 							카카오 테크 부트캠프
 						</div>
 						<p className="text-xs text-gray-500 dark:text-gray-400">
-							© 2025 KTB Project Gallery. All rights reserved.
+							© 2025 Kakao Tech Bootcamp. All rights reserved.
 						</p>
 					</div>
 
