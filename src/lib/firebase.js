@@ -30,7 +30,8 @@ import {
 	getDoc,
 	getCountFromServer,
 	limit,
-	getDocs
+	getDocs,
+	setDoc
 } from "firebase/firestore";
 import { hashPassword } from "./crypto";
 
