@@ -52,6 +52,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 			});
 			return () => {
 				unsubscribe();
+				document.body.style.overflow = 'unset';
 			};
 		}
 	}, [isOpen, project]);
