@@ -56,6 +56,11 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 		return colors[index];
 	};
 
+
+
+	// Version Badge - dynamic color?
+	// Let's just use a clean green/teal badge.
+
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: 20 }}
@@ -86,6 +91,13 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 				{project.team && (
 					<div className="absolute top-3 left-3 bg-kakao-black/80 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg">
 						{project.team}
+					</div>
+				)}
+
+				{/* Latest Version Badge */}
+				{project.latestVersion && (
+					<div className="absolute top-3 left-[calc(3rem+20px)] ml-2 bg-green-500/90 text-white text-xs font-bold px-2.5 py-1 rounded-md backdrop-blur-sm border border-white/10 shadow-lg flex items-center gap-1">
+						🚀 {project.latestVersion}
 					</div>
 				)}
 

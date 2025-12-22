@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { X, Send, Trash2, Calendar, User, Edit2, Check, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword } from '../lib/firebase';
+import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword, subscribeToDeployments, addDeploymentLog, deleteDeploymentLog, verifyProjectPassword, getDeploymentCount, updateDeploymentLog } from '../lib/firebase';
 import PasswordModal from './PasswordModal';
 import ConfirmModal from './ConfirmModal';
 import { checkProfanity } from '../lib/profanityFilter';
@@ -28,6 +28,22 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
+	// Deployment Logs State
+	const [deployments, setDeployments] = useState([]);
+	const [isAddingDeployment, setIsAddingDeployment] = useState(false);
+	const [newVersion, setNewVersion] = useState('');
+	const [newLogContent, setNewLogContent] = useState('');
+	const [deploymentPassword, setDeploymentPassword] = useState('');
+	const [deployLimit, setDeployLimit] = useState(1); // Start with 1 log
+	const [totalDeployments, setTotalDeployments] = useState(0);
+	const [editingDeploymentId, setEditingDeploymentId] = useState(null);
+	const [editVersion, setEditVersion] = useState('');
+	const [editLogContent, setEditLogContent] = useState('');
+	const SHOW_MORE_COUNT = 5;
+
+	// Version Regex: strict Major.Minor.Patch (e.g. 1.0.0, 2.12.3)
+	const VERSION_REGEX = /^\d+\.\d+\.\d+$/;
+
 	useEffect(() => {
 		if (isOpen && project) {
 			document.body.style.overflow = 'hidden';
@@ -35,11 +51,25 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 				setComments(data);
 			});
 			return () => {
-				document.body.style.overflow = 'unset';
 				unsubscribe();
 			};
 		}
 	}, [isOpen, project]);
+
+	// Subscribe to deployments
+	useEffect(() => {
+		if (isOpen && project) {
+			// Fetch total count initially and whenever deployments change (to keep sync)
+			getDeploymentCount(project.id).then(setTotalDeployments);
+
+			const unsubscribe = subscribeToDeployments(project.id, (data) => {
+				setDeployments(data);
+				// Also update count on real-time update if possible, or just re-fetch
+				getDeploymentCount(project.id).then(setTotalDeployments);
+			}, deployLimit);
+			return () => unsubscribe();
+		}
+	}, [isOpen, project, deployLimit]);
 
 	const handleCommentSubmit = async (e) => {
 		e.preventDefault();
@@ -119,6 +149,34 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 			} else {
 				return result; // Return object with error message
 			}
+		} else if (passwordModalMode === 'add_deployment' || passwordModalMode === 'delete_deployment' || passwordModalMode === 'edit_deployment') {
+			const result = await verifyProjectPassword(project.id, inputPassword);
+			if (result.success) {
+				if (passwordModalMode === 'add_deployment') {
+					setIsPasswordModalOpen(false);
+					setIsAddingDeployment(true);
+				} else if (passwordModalMode === 'edit_deployment') {
+					setIsPasswordModalOpen(false);
+					// Set editing state
+					const logToEdit = deployments.find(d => d.id === editingDeploymentId); // editingDeploymentId set on click
+					if (logToEdit) {
+						setEditVersion(logToEdit.version || '');
+						setEditLogContent(logToEdit.content || '');
+						// Force re-render of that item in edit mode (we use editingDeploymentId for UI control)
+					}
+				} else {
+					// delete_deployment
+					setIsPasswordModalOpen(false);
+					// Open confirm modal? or just delete?
+					// Let's use Confirm Modal effectively
+					// But confirm modal currently is hardcoded for comments in some generic way?
+					// Let's update ConfirmModal props to be dynamic.
+					setIsConfirmModalOpen(true);
+				}
+				return true;
+			} else {
+				return result;
+			}
 		}
 	};
 
@@ -157,6 +215,80 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 			setDeleteTargetId(null);
 			setPendingDeletePassword(null);
 			if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
+		} else if (passwordModalMode === 'delete_deployment' && deleteTargetId) {
+			// Confirm delete deployment
+			await deleteDeploymentLog(project.id, deleteTargetId);
+			setDeleteTargetId(null);
+			setPasswordModalMode('delete'); // Reset to default
+			if (showToast) showToast("배포 기록이 삭제되었습니다!", 'success');
+		}
+	};
+
+	// Deployment Handlers
+	const handleAddDeployment = async () => {
+		if (!newVersion.trim() || !newLogContent.trim()) return;
+
+		if (!VERSION_REGEX.test(newVersion)) {
+			if (showToast) showToast("버전 형식이 올바르지 않습니다. (예: 1.0.0)", 'error');
+			return;
+		}
+
+		const result = await addDeploymentLog(project.id, {
+			version: newVersion,
+			content: newLogContent
+		});
+
+		if (result.success) {
+			setIsAddingDeployment(false);
+			setNewVersion('');
+			setNewLogContent('');
+			setDeploymentPassword('');
+			// Reset limit to see the new one if we were on older page? Or just keep it.
+			// Let's reset to show the top one clearly or just leave it.
+			if (showToast) showToast("새 버전이 등록되었습니다!", 'success');
+		} else {
+			if (showToast) showToast("버전 등록에 실패했습니다.", 'error');
+		}
+	};
+
+	const handleDeleteDeploymentClick = (logId) => {
+		setDeleteTargetId(logId);
+		setPasswordModalMode('delete_deployment');
+		setIsPasswordModalOpen(true);
+	};
+
+	const handleEditDeploymentClick = (logId) => {
+		setEditingDeploymentId(logId);
+		setPasswordModalMode('edit_deployment');
+		setIsPasswordModalOpen(true);
+	};
+
+	const handleCancelDeploymentEdit = () => {
+		setEditingDeploymentId(null);
+		setEditVersion('');
+		setEditLogContent('');
+	};
+
+	const handleSaveDeploymentEdit = async () => {
+		if (!editVersion.trim() || !editLogContent.trim()) return;
+
+		if (!VERSION_REGEX.test(editVersion)) {
+			if (showToast) showToast("버전 형식이 올바르지 않습니다. (예: 1.0.0)", 'error');
+			return;
+		}
+
+		const result = await updateDeploymentLog(project.id, editingDeploymentId, {
+			version: editVersion,
+			content: editLogContent
+		});
+
+		if (result.success) {
+			setEditingDeploymentId(null);
+			setEditVersion('');
+			setEditLogContent('');
+			if (showToast) showToast("배포 기록이 수정되었습니다!", 'success');
+		} else {
+			if (showToast) showToast("수정에 실패했습니다.", 'error');
 		}
 	};
 
@@ -242,6 +374,160 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 											<a href={project.url} target="_blank" rel="noopener noreferrer" className="block w-full bg-kakao-yellow text-kakao-black text-center py-3 rounded-xl font-bold hover:bg-yellow-400 transition-colors">
 												서비스 보러가기
 											</a>
+										</div>
+									</div>
+
+									{/* Release Notes Section */}
+									<div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+										<div className="flex items-center justify-between mb-4">
+											<h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+												<Calendar className="w-5 h-5" />
+												배포 기록
+											</h3>
+											<button
+												onClick={() => {
+													setPasswordModalMode('add_deployment');
+													setIsPasswordModalOpen(true);
+												}}
+												className="text-sm px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium"
+											>
+												+ 버전 추가
+											</button>
+										</div>
+
+										{isAddingDeployment && (
+											<div className="mb-6 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700 animate-in fade-in slide-in-from-top-2">
+												<h4 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">새 버전 기록 추가</h4>
+												<div className="space-y-3">
+													<div>
+														<label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">버전 & 날짜</label>
+														<input
+															type="text"
+															value={newVersion}
+															onChange={(e) => setNewVersion(e.target.value)}
+															placeholder="예: 1.0.0"
+															className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
+														/>
+														<p className="text-[10px] text-gray-400 mt-1">Major.Minor.Patch 형식 (예: 1.0.0)</p>
+													</div>
+													<div>
+														<label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">업데이트 내용</label>
+														<textarea
+															value={newLogContent}
+															onChange={(e) => setNewLogContent(e.target.value)}
+															placeholder="주요 변경 사항을 입력해주세요. (Markdown 지원)"
+															rows={6}
+															className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
+														/>
+													</div>
+													<div className="flex justify-end gap-2 pt-2">
+														<button
+															onClick={() => {
+																setIsAddingDeployment(false);
+																setNewVersion('');
+																setNewLogContent('');
+																setDeploymentPassword('');
+															}}
+															className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+														>
+															취소
+														</button>
+														<button
+															onClick={handleAddDeployment}
+															disabled={!newVersion.trim() || !newLogContent.trim()}
+															className="px-4 py-1.5 text-sm font-bold bg-kakao-yellow text-kakao-black rounded-lg hover:bg-yellow-400 disabled:opacity-50 transition-colors"
+														>
+															등록
+														</button>
+													</div>
+												</div>
+											</div>
+										)}
+
+										<div className="space-y-4">
+											{deployments.length === 0 ? (
+												<div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">
+													아직 등록된 배포 기록이 없습니다.
+												</div>
+											) : (
+												deployments.map((log) => (
+													<div key={log.id} className="relative pl-4 border-l-2 border-gray-200 dark:border-gray-700 py-1 group">
+														<div className="absolute -left-[5px] top-2 w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-gray-600 ring-4 ring-white dark:ring-gray-800 group-hover:bg-kakao-yellow transition-colors"></div>
+
+														{editingDeploymentId === log.id ? (
+															// Inline Edit Mode for Deployment
+															<div className="space-y-3 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-dashed border-kakao-yellow">
+																<div>
+																	<label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">버전</label>
+																	<input
+																		type="text"
+																		value={editVersion}
+																		onChange={(e) => setEditVersion(e.target.value)}
+																		className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
+																	/>
+																</div>
+																<div>
+																	<label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">내용</label>
+																	<textarea
+																		value={editLogContent}
+																		onChange={(e) => setEditLogContent(e.target.value)}
+																		rows={5}
+																		className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
+																	/>
+																</div>
+																<div className="flex justify-end gap-2 text-xs">
+																	<button onClick={handleCancelDeploymentEdit} className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700">취소</button>
+																	<button onClick={handleSaveDeploymentEdit} className="px-3 py-1.5 bg-kakao-yellow text-kakao-black rounded-md hover:bg-yellow-400 font-bold">저장</button>
+																</div>
+															</div>
+														) : (
+															<>
+																<div className="flex justify-between items-start">
+																	<div>
+																		<h4 className="font-bold text-gray-900 dark:text-white text-sm">
+																			{log.version}
+																		</h4>
+																		<p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+																			{log.createdAt?.seconds ? new Date(log.createdAt.seconds * 1000).toLocaleDateString() : '방금 전'}
+																		</p>
+																	</div>
+																	<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+																		<button
+																			onClick={() => handleEditDeploymentClick(log.id)}
+																			className="p-1 text-gray-300 hover:text-blue-500 transition-colors"
+																			title="수정"
+																		>
+																			<Edit2 className="w-3.5 h-3.5" />
+																		</button>
+																		<button
+																			onClick={() => handleDeleteDeploymentClick(log.id)}
+																			className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+																			title="삭제"
+																		>
+																			<Trash2 className="w-3.5 h-3.5" />
+																		</button>
+																	</div>
+																</div>
+																<div className="mt-2 text-sm text-gray-600 dark:text-gray-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none">
+																	<ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+																		{log.content}
+																	</ReactMarkdown>
+																</div>
+															</>
+														)}
+													</div>
+												))
+											)}
+
+											{/* Show More Button */}
+											{deployments.length < totalDeployments && (
+												<button
+													onClick={() => setDeployLimit(prev => prev + SHOW_MORE_COUNT)}
+													className="w-full py-2 text-xs font-bold text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-dashed border-gray-200 dark:border-gray-600"
+												>
+													더보기 ({totalDeployments - deployments.length}개 남음)
+												</button>
+											)}
 										</div>
 									</div>
 
@@ -397,16 +683,25 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 						isOpen={isPasswordModalOpen}
 						onClose={() => setIsPasswordModalOpen(false)}
 						onVerify={handlePasswordVerify}
-						title={passwordModalMode === 'delete' ? "댓글 삭제" : "댓글 수정"}
-						description={passwordModalMode === 'delete' ? "댓글을 삭제하려면 비밀번호를 입력하세요." : "댓글 내용을 수정하려면 비밀번호를 입력하세요."}
+						title={
+							passwordModalMode === 'delete' ? "댓글 삭제" :
+								passwordModalMode === 'edit' ? "댓글 수정" :
+									passwordModalMode === 'add_deployment' ? "버전 추가 (관리자)" :
+										passwordModalMode === 'delete_deployment' ? "버전 삭제 (관리자)" : "버전 수정 (관리자)"
+						}
+						description={
+							passwordModalMode === 'delete' ? "댓글을 삭제하려면 비밀번호를 입력하세요." :
+								passwordModalMode === 'edit' ? "댓글 내용을 수정하려면 비밀번호를 입력하세요." :
+									"프로젝트 비밀번호를 입력하세요."
+						}
 					/>
 
 					<ConfirmModal
 						isOpen={isConfirmModalOpen}
 						onClose={() => setIsConfirmModalOpen(false)}
 						onConfirm={handleConfirmDelete}
-						title="댓글 삭제"
-						description="정말로 댓글을 삭제하시겠습니까?&#10;삭제된 댓글은 복구할 수 없습니다."
+						title={passwordModalMode === 'delete_deployment' ? "배포 기록 삭제" : "댓글 삭제"}
+						description={passwordModalMode === 'delete_deployment' ? "정말로 이 배포 기록을 삭제하시겠습니까?" : "정말로 댓글을 삭제하시겠습니까?\n삭제된 댓글은 복구할 수 없습니다."}
 						confirmText="삭제하기"
 						isDangerous={true}
 					/>

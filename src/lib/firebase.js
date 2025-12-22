@@ -16,7 +16,22 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-import { collection, addDoc, onSnapshot, query, setDoc, orderBy, serverTimestamp, doc, updateDoc, getDoc, arrayUnion, arrayRemove, deleteDoc, increment, getCountFromServer } from "firebase/firestore";
+import {
+	collection,
+	addDoc,
+	onSnapshot,
+	query,
+	orderBy,
+	serverTimestamp,
+	doc,
+	deleteDoc,
+	updateDoc,
+	increment,
+	getDoc,
+	getCountFromServer,
+	limit,
+	getDocs
+} from "firebase/firestore";
 import { hashPassword } from "./crypto";
 
 const COLLECTION_NAME = "projects";
@@ -329,4 +344,100 @@ export const syncCommentCounts = async () => {
 	}
 };
 
+// --- Deployments (Release Notes) ---
 
+export const subscribeToDeployments = (projectId, callback, limitCount = 5) => {
+	const q = query(
+		collection(db, COLLECTION_NAME, projectId, "deployments"),
+		orderBy("createdAt", "desc"),
+		limit(limitCount)
+	);
+
+	return onSnapshot(q, (snapshot) => {
+		const deployments = snapshot.docs.map(doc => ({
+			id: doc.id,
+			...doc.data()
+		}));
+		callback(deployments);
+	});
+};
+
+export const addDeploymentLog = async (projectId, logData) => {
+	try {
+		await addDoc(collection(db, COLLECTION_NAME, projectId, "deployments"), {
+			...logData,
+			createdAt: serverTimestamp()
+		});
+
+		// Update latestVersion on the main project document
+		if (logData.version) {
+			await updateDoc(doc(db, COLLECTION_NAME, projectId), {
+				latestVersion: logData.version
+			});
+		}
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error adding deployment log: ", error);
+		return { success: false, error };
+	}
+};
+
+export const updateDeploymentLog = async (projectId, logId, updateData) => {
+	try {
+		const logRef = doc(db, COLLECTION_NAME, projectId, "deployments", logId);
+		await updateDoc(logRef, {
+			...updateData,
+			updatedAt: serverTimestamp()
+		});
+
+		// Check if this is the latest deployment (by checking the FIRST one in desc order)
+		// A bit expensive to query again, but safe.
+		// Actually, we can just check if the updated version is meant to be the "latest".
+		// Better approach: Query the most recent one after update.
+		const q = query(
+			collection(db, COLLECTION_NAME, projectId, "deployments"),
+			orderBy("createdAt", "desc"),
+			limit(1)
+		);
+
+		// We need to wait a tiny bit or just fetch.
+		const snapshot = await getDocs(q);
+		if (!snapshot.empty) {
+			const latestLog = snapshot.docs[0].data();
+			// If the modified log is indeed the latest one (by date), update project latestVersion
+			// Note: If we only edited content, version might be same. If we edited version, it changes.
+			// We blindly update project.latestVersion to whatever the top log says now.
+			await updateDoc(doc(db, COLLECTION_NAME, projectId), {
+				latestVersion: latestLog.version
+			});
+		}
+
+		return { success: true };
+	} catch (error) {
+		console.error("Error updating deployment log: ", error);
+		return { success: false, error };
+	}
+};
+
+export const deleteDeploymentLog = async (projectId, logId) => {
+	try {
+		await deleteDoc(doc(db, COLLECTION_NAME, projectId, "deployments", logId));
+		return { success: true };
+	} catch (error) {
+		console.error("Error deleting deployment log: ", error);
+		return { success: false, error };
+	}
+};
+
+
+export const getDeploymentCount = async (projectId) => {
+	try {
+		const coll = collection(db, COLLECTION_NAME, projectId, "deployments");
+		const snapshot = await getCountFromServer(coll);
+		return snapshot.data().count;
+	} catch (error) {
+		console.error("Error getting deployment count:", error);
+		return 0;
+	}
+};
