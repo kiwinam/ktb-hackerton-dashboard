@@ -64,10 +64,11 @@ const PasswordModal = ({ isOpen, onClose, onVerify }) => {
 										setError(false);
 									}}
 									className={`w-full text-center text-2xl tracking-[0.5em] px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all font-mono ${error
-											? 'border-red-300 focus:ring-red-200 bg-red-50'
-											: 'border-gray-300 focus:ring-kakao-yellow focus:border-transparent'
+										? 'border-red-300 focus:ring-red-200 bg-red-50'
+										: 'border-gray-300 focus:ring-kakao-yellow focus:border-transparent'
 										}`}
 									placeholder="****"
+									autoComplete="new-password"
 								/>
 
 								{error && (

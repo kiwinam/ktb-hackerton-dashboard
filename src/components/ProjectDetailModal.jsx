@@ -9,7 +9,7 @@ import PasswordModal from './PasswordModal';
 
 const BAD_WORDS = ['바보', '멍청이', '씨발', '개새끼', '병신', '지랄', 'fuck', 'shit']; // Simple Profanity Filter - Add more if needed
 
-const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess }) => {
+const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showToast }) => {
 	const [comments, setComments] = useState([]);
 	const [newComment, setNewComment] = useState('');
 	const [authorName, setAuthorName] = useState('');
@@ -72,8 +72,10 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess }) => {
 		if (result.success) {
 			setIsPasswordModalOpen(false);
 			setDeleteTargetId(null);
+			if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
 			return true;
 		} else {
+			if (showToast) showToast("비밀번호가 일치하지 않습니다.", 'error');
 			return false;
 		}
 	};
@@ -217,6 +219,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess }) => {
 														value={password}
 														onChange={(e) => setPassword(e.target.value)}
 														required
+														autoComplete="new-password"
 														className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
 													/>
 												</div>

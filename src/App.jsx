@@ -25,6 +25,7 @@ function App() {
     localStorage.setItem('project_sort_order', sortBy);
   }, [sortBy]);
   const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success');
 
   // Generate Session ID for Likes if not exists
   useEffect(() => {
@@ -68,8 +69,9 @@ function App() {
     setEditingProject(null);
   };
 
-  const showToast = (msg) => {
+  const showToast = (msg, type = 'success') => {
     setToastMessage(msg);
+    setToastType(type);
   };
 
   const sortedProjects = [...projects].sort((a, b) => {
@@ -130,7 +132,8 @@ function App() {
         project={selectedProject}
         isOpen={!!selectedProject}
         onClose={() => setSelectedProject(null)}
-        onCommentSuccess={(msg) => showToast(msg)}
+        showToast={showToast}
+        onCommentSuccess={(msg) => showToast(msg, 'success')}
       />
 
       <RegisterModal
@@ -150,6 +153,7 @@ function App() {
         {toastMessage && (
           <Toast
             message={toastMessage}
+            type={toastType}
             onClose={() => setToastMessage('')}
           />
         )}
