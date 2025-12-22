@@ -191,13 +191,13 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 												type="password"
 												name="password"
 												required
-												maxLength={4}
+												maxLength={6}
 												disabled={!!initialData}
 												value={formData.password}
 												onChange={handleChange}
 												autoComplete="new-password"
 												className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
-												placeholder="숫자 4자리"
+												placeholder="숫자 4~6자리"
 											/>
 										</div>
 									</div>

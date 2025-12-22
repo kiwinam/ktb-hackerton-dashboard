@@ -232,15 +232,51 @@ export const updateComment = async (projectId, commentId, password, newContent) 
 	}
 };
 
-export const verifyCommentPassword = async (projectId, commentId, password) => {
+// Rate Limiter Helper
+const checkRateLimit = async (sessionId) => {
+	const RATE_LIMIT_COLLECTION = "rate_limits";
+	const limitRef = doc(db, RATE_LIMIT_COLLECTION, sessionId);
+
 	try {
+		const docSnap = await getDoc(limitRef);
+		const now = Date.now();
+		let timestamps = [];
+
+		if (docSnap.exists()) {
+			timestamps = docSnap.data().timestamps || [];
+		}
+
+		// Filter timestamps older than 1 minute
+		timestamps = timestamps.filter(t => now - t < 60000);
+
+		if (timestamps.length >= 5) {
+			return { allowed: false, error: "너무 많은 시도를 했습니다.\n1분 후에 다시 시도해주세요." };
+		}
+
+		timestamps.push(now);
+		await setDoc(limitRef, { timestamps });
+		return { allowed: true };
+	} catch (error) {
+		console.error("Rate limit check error:", error);
+		// Fail open if rate limit check fails, to not block users on system error
+		return { allowed: true };
+	}
+};
+
+export const verifyCommentPassword = async (projectId, commentId, password, sessionId) => {
+	try {
+		if (sessionId) {
+			const limitCheck = await checkRateLimit(sessionId);
+			if (!limitCheck.allowed) return { success: false, error: limitCheck.error };
+		}
+
 		const commentRef = doc(db, COLLECTION_NAME, projectId, "comments", commentId);
 		const isValid = await _verifySecret(COMMENT_SECRETS_COLLECTION, commentId, password, commentRef);
 
 		if (isValid) {
 			return { success: true };
 		} else {
-			return { success: false, error: "Incorrect password" };
+			return { success: false, error: "비밀번호가 일치하지 않습니다." };
 		}
 	} catch (error) {
 		console.error("Error verifying password: ", error);
@@ -248,15 +284,20 @@ export const verifyCommentPassword = async (projectId, commentId, password) => {
 	}
 };
 
-export const verifyProjectPassword = async (projectId, password) => {
+export const verifyProjectPassword = async (projectId, password, sessionId) => {
 	try {
+		if (sessionId) {
+			const limitCheck = await checkRateLimit(sessionId);
+			if (!limitCheck.allowed) return { success: false, error: limitCheck.error };
+		}
+
 		const projectRef = doc(db, COLLECTION_NAME, projectId);
 		const isValid = await _verifySecret(PROJECT_SECRETS_COLLECTION, projectId, password, projectRef);
 
 		if (isValid) {
 			return { success: true };
 		} else {
-			return { success: false, error: "Incorrect password" };
+			return { success: false, error: "비밀번호가 일치하지 않습니다." };
 		}
 	} catch (error) {
 		console.error("Error verifying project password: ", error);

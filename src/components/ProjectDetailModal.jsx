@@ -85,20 +85,26 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 	};
 
 	const handlePasswordVerify = async (inputPassword) => {
+		const sessionId = localStorage.getItem('hackathon_session_id');
 		if (passwordModalMode === 'delete') {
-			const result = await verifyCommentPassword(project.id, deleteTargetId, inputPassword);
+			const result = await verifyCommentPassword(project.id, deleteTargetId, inputPassword, sessionId);
 			if (result.success) {
-				// Password matches! Close password modal and open confirmation
-				setIsPasswordModalOpen(false);
-				setPendingDeletePassword(inputPassword);
-				setIsConfirmModalOpen(true);
-				return true;
+				if (window.confirm("정말로 댓글을 삭제하시겠습니까?")) {
+					await deleteComment(project.id, deleteTargetId, inputPassword);
+					setIsPasswordModalOpen(false);
+					setDeleteTargetId(null);
+					if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
+					return true;
+				} else {
+					// User cancelled delete after password verify - just close modal?
+					setIsPasswordModalOpen(false);
+					return true; // Technically password was valid
+				}
 			} else {
-				// PasswordModal handles UI error
-				return false;
+				return result; // Return object with error message
 			}
 		} else if (passwordModalMode === 'edit') {
-			const result = await verifyCommentPassword(project.id, editTargetId, inputPassword);
+			const result = await verifyCommentPassword(project.id, editTargetId, inputPassword, sessionId);
 			if (result.success) {
 				setIsPasswordModalOpen(false);
 				setEditPassword(inputPassword);
@@ -111,8 +117,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 				setEditTargetId(null);
 				return true;
 			} else {
-				if (showToast) showToast("비밀번호가 일치하지 않습니다.", 'error');
-				return false;
+				return result; // Return object with error message
 			}
 		}
 	};
@@ -262,14 +267,14 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 													/>
 													<input
 														type="password"
-														placeholder="비밀번호 (숫자 4자리)"
+														placeholder="비밀번호 (숫자 4~6자리)"
 														value={password}
 														onChange={(e) => {
 															const val = e.target.value.replace(/[^0-9]/g, '');
 															setPassword(val);
 														}}
 														required
-														maxLength={4}
+														maxLength={6}
 														inputMode="numeric"
 														pattern="[0-9]*"
 														autoComplete="new-password"

@@ -57,11 +57,14 @@ function App() {
 
   const handlePasswordVerified = async (inputPassword) => {
     if (pendingEditProject) {
-      const result = await verifyProjectPassword(pendingEditProject.id, inputPassword);
+      const sessionId = localStorage.getItem('hackathon_session_id');
+      const result = await verifyProjectPassword(pendingEditProject.id, inputPassword, sessionId);
       if (result.success) {
         setEditingProject(pendingEditProject);
         setIsModalOpen(true);
         return true;
+      } else {
+        return result; // Return full result object to handle specific error messages
       }
     }
     return false;

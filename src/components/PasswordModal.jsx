@@ -4,17 +4,19 @@ import { X, Lock } from 'lucide-react';
 
 const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인", description = "비밀번호를 입력해주세요." }) => {
 	const [password, setPassword] = useState('');
-	const [error, setError] = useState(false);
+	const [error, setError] = useState(null);
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 		const result = await onVerify(password);
-		if (result) {
+		if (result === true || result?.success) {
 			setPassword('');
-			setError(false);
+			setError(null);
 			onClose();
 		} else {
-			setError(true);
+			// result is either false or an object with error message
+			const msg = result?.error || "비밀번호가 일치하지 않습니다.";
+			setError(msg);
 			// Shake animation trigger could go here
 		}
 	};
@@ -58,26 +60,26 @@ const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인
 								<input
 									type="password"
 									autoFocus
-									maxLength={4}
+									maxLength={6}
 									inputMode="numeric"
 									pattern="[0-9]*"
 									value={password}
 									onChange={(e) => {
 										const val = e.target.value.replace(/[^0-9]/g, '');
 										setPassword(val);
-										setError(false);
+										setError(null);
 									}}
 									className={`w-full text-center text-2xl tracking-[0.5em] px-4 py-3 border rounded-lg focus:ring-2 outline-none transition-all font-mono ${error
 										? 'border-red-300 focus:ring-red-200 bg-red-50'
 										: 'border-gray-300 focus:ring-kakao-yellow focus:border-transparent'
 										}`}
-									placeholder="****"
+									placeholder="******"
 									autoComplete="new-password"
 								/>
 
 								{error && (
-									<p className="text-red-500 text-xs mt-2 text-center font-medium">
-										비밀번호가 일치하지 않습니다.
+									<p className="text-red-500 text-xs mt-2 text-center font-medium whitespace-pre-wrap">
+										{error}
 									</p>
 								)}
 
