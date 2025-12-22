@@ -6,7 +6,7 @@ import RegisterModal from './components/RegisterModal';
 import PasswordModal from './components/PasswordModal';
 import ProjectDetailModal from './components/ProjectDetailModal';
 import Toast from './components/Toast';
-import { subscribeToProjects } from './lib/firebase';
+import { subscribeToProjects, migrateLegacyData, verifyProjectPassword } from './lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
 
 function App() {
@@ -55,11 +55,14 @@ function App() {
     setIsPasswordModalOpen(true);
   };
 
-  const handlePasswordVerified = (inputPassword) => {
-    if (pendingEditProject && inputPassword === pendingEditProject.password) {
-      setEditingProject(pendingEditProject);
-      setIsModalOpen(true);
-      return true;
+  const handlePasswordVerified = async (inputPassword) => {
+    if (pendingEditProject) {
+      const result = await verifyProjectPassword(pendingEditProject.id, inputPassword);
+      if (result.success) {
+        setEditingProject(pendingEditProject);
+        setIsModalOpen(true);
+        return true;
+      }
     }
     return false;
   };
@@ -72,6 +75,18 @@ function App() {
   const showToast = (msg, type = 'success') => {
     setToastMessage(msg);
     setToastType(type);
+  };
+
+  const handleMigrate = async () => {
+    if (!window.confirm("정말로 데이터 마이그레이션을 진행하시겠습니까? (모든 비밀번호 암호화)")) return;
+    setLoading(true);
+    const result = await migrateLegacyData();
+    setLoading(false);
+    if (result.success) {
+      alert(`마이그레이션 완료!\n프로젝트: ${result.pCount}개\n댓글: ${result.cCount}개`);
+    } else {
+      alert("오류 발생: " + result.error);
+    }
   };
 
   const sortedProjects = [...projects].sort((a, b) => {
@@ -92,7 +107,7 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-end mb-6">
-          <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex shadow-sm">
+          <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex shadow-sm items-center">
             <button
               onClick={() => setSortBy('latest')}
               className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${sortBy === 'latest'
@@ -110,6 +125,12 @@ function App() {
                 }`}
             >
               좋아요순
+            </button>
+            <button
+              onClick={handleMigrate}
+              className="ml-2 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50 rounded-md border border-red-200 transition-colors"
+            >
+              DB 마이그레이션
             </button>
           </div>
         </div>
@@ -147,6 +168,8 @@ function App() {
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
         onVerify={handlePasswordVerified}
+        title="프로젝트 수정"
+        description="프로젝트 정보를 수정하려면 비밀번호를 입력하세요."
       />
 
       <AnimatePresence>

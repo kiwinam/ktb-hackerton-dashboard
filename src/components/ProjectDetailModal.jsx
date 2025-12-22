@@ -6,6 +6,7 @@ import { X, Send, Trash2, Calendar, User, Edit2, Check, XCircle } from 'lucide-r
 import { motion, AnimatePresence } from 'framer-motion';
 import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword } from '../lib/firebase';
 import PasswordModal from './PasswordModal';
+import ConfirmModal from './ConfirmModal';
 import { checkProfanity } from '../lib/profanityFilter';
 
 const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showToast }) => {
@@ -21,6 +22,10 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 
 	const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 	const [passwordModalMode, setPasswordModalMode] = useState('delete'); // 'delete' or 'edit'
+
+	const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+	const [pendingDeletePassword, setPendingDeletePassword] = useState(null);
+
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	useEffect(() => {
@@ -81,14 +86,15 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 
 	const handlePasswordVerify = async (inputPassword) => {
 		if (passwordModalMode === 'delete') {
-			const result = await deleteComment(project.id, deleteTargetId, inputPassword);
+			const result = await verifyCommentPassword(project.id, deleteTargetId, inputPassword);
 			if (result.success) {
+				// Password matches! Close password modal and open confirmation
 				setIsPasswordModalOpen(false);
-				setDeleteTargetId(null);
-				if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
+				setPendingDeletePassword(inputPassword);
+				setIsConfirmModalOpen(true);
 				return true;
 			} else {
-				if (showToast) showToast("비밀번호가 일치하지 않습니다.", 'error');
+				// PasswordModal handles UI error
 				return false;
 			}
 		} else if (passwordModalMode === 'edit') {
@@ -114,8 +120,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 	const handleSaveEdit = async () => {
 		if (!editContent.trim()) return;
 
-		const hasBadWord = BAD_WORDS.some(word => editContent.includes(word));
-		if (hasBadWord) {
+		if (checkProfanity(editContent)) {
 			alert("비속어가 포함된 댓글은 등록할 수 없습니다. 바르고 고운 말을 써주세요! 😊");
 			return;
 		}
@@ -139,6 +144,16 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 	};
 
 
+
+
+	const handleConfirmDelete = async () => {
+		if (deleteTargetId && pendingDeletePassword) {
+			await deleteComment(project.id, deleteTargetId, pendingDeletePassword);
+			setDeleteTargetId(null);
+			setPendingDeletePassword(null);
+			if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
+		}
+	};
 
 
 	if (!isOpen || !project) return null;
@@ -296,7 +311,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 															<div className="space-y-2">
 																<div className="flex items-center justify-between mb-2">
 																	<span className="font-bold text-sm text-gray-900">{comment.author}</span>
-																	<span className="text-xs text-kakao-yellow font-bold">수정 중...</span>
+																	<span className="text-xs text-kakao-brown font-bold animate-pulse">수정 중...</span>
 																</div>
 																<textarea
 																	value={editContent}
@@ -368,7 +383,17 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 						onClose={() => setIsPasswordModalOpen(false)}
 						onVerify={handlePasswordVerify}
 						title={passwordModalMode === 'delete' ? "댓글 삭제" : "댓글 수정"}
-						description={passwordModalMode === 'delete' ? "삭제하려면 비밀번호를 입력하세요." : "수정하려면 비밀번호를 입력하세요."}
+						description={passwordModalMode === 'delete' ? "댓글을 삭제하려면 비밀번호를 입력하세요." : "댓글 내용을 수정하려면 비밀번호를 입력하세요."}
+					/>
+
+					<ConfirmModal
+						isOpen={isConfirmModalOpen}
+						onClose={() => setIsConfirmModalOpen(false)}
+						onConfirm={handleConfirmDelete}
+						title="댓글 삭제"
+						description="정말로 댓글을 삭제하시겠습니까?&#10;삭제된 댓글은 복구할 수 없습니다."
+						confirmText="삭제하기"
+						isDangerous={true}
 					/>
 				</>
 			)}

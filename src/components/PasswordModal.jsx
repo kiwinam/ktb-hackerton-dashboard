@@ -6,9 +6,10 @@ const PasswordModal = ({ isOpen, onClose, onVerify }) => {
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState(false);
 
-	const handleSubmit = (e) => {
+	const handleSubmit = async (e) => {
 		e.preventDefault();
-		if (onVerify(password)) {
+		const result = await onVerify(password);
+		if (result) {
 			setPassword('');
 			setError(false);
 			onClose();
