@@ -215,10 +215,16 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 													/>
 													<input
 														type="password"
-														placeholder="비밀번호 (삭제용)"
+														placeholder="비밀번호 (숫자 4자리)"
 														value={password}
-														onChange={(e) => setPassword(e.target.value)}
+														onChange={(e) => {
+															const val = e.target.value.replace(/[^0-9]/g, '');
+															setPassword(val);
+														}}
 														required
+														maxLength={4}
+														inputMode="numeric"
+														pattern="[0-9]*"
 														autoComplete="new-password"
 														className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow"
 													/>
