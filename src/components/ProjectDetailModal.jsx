@@ -6,8 +6,7 @@ import { X, Send, Trash2, Calendar, User, Edit2, Check, XCircle } from 'lucide-r
 import { motion, AnimatePresence } from 'framer-motion';
 import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword } from '../lib/firebase';
 import PasswordModal from './PasswordModal';
-
-const BAD_WORDS = ['바보', '멍청이', '씨발', '개새끼', '병신', '지랄', 'fuck', 'shit']; // Simple Profanity Filter - Add more if needed
+import { checkProfanity } from '../lib/profanityFilter';
 
 const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showToast }) => {
 	const [comments, setComments] = useState([]);
@@ -42,8 +41,8 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 		if (!newComment.trim() || !authorName.trim() || !password.trim()) return;
 
 		// Profanity Check
-		const hasBadWord = BAD_WORDS.some(word => newComment.includes(word));
-		if (hasBadWord) {
+		// Profanity Check
+		if (checkProfanity(newComment)) {
 			alert("비속어가 포함된 댓글은 등록할 수 없습니다. 바르고 고운 말을 써주세요! 😊");
 			return;
 		}
