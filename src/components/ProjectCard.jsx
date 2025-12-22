@@ -1,21 +1,16 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ExternalLink, Edit2, Heart, MessageCircle } from 'lucide-react';
-import { toggleLike, subscribeToComments } from '../lib/firebase';
+import { toggleLike } from '../lib/firebase';
 
 const ProjectCard = ({ project, onEdit, onClick }) => {
 	const [isLiking, setIsLiking] = useState(false);
-	const [commentCount, setCommentCount] = useState(0);
+	// const [commentCount, setCommentCount] = useState(0); // Removing local state
 	const sessionId = localStorage.getItem('hackathon_session_id');
 	const isLiked = project.likedBy?.includes(sessionId);
 
-	// Subscribe to comments count
-	React.useEffect(() => {
-		const unsubscribe = subscribeToComments(project.id, (comments) => {
-			setCommentCount(comments.length);
-		});
-		return () => unsubscribe();
-	}, [project.id]);
+	// Removed individual subscription to comments to prevent N+1 listener issues
+	// React.useEffect(() => { ... }, [project.id]);
 
 	const handleEditClick = (e) => {
 		e.preventDefault();
@@ -74,6 +69,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 					<img
 						src={project.imageUrl}
 						alt={project.title}
+						loading="lazy"
 						className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
 						onError={(e) => {
 							e.target.src = "https://via.placeholder.com/640x360?text=No+Image";
@@ -154,7 +150,7 @@ const ProjectCard = ({ project, onEdit, onClick }) => {
 
 						<div className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 rounded-lg text-sm font-bold bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
 							<MessageCircle className="w-4 h-4" />
-							<span>{commentCount}</span>
+							<span>{project.commentCount || 0}</span>
 						</div>
 					</div>
 

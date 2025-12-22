@@ -1,8 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// TODO: Replace the following with your app's Firebase project configuration
-// See: https://firebase.google.com/docs/web/setup#available-libraries
 const firebaseConfig = {
 	apiKey: "AIzaSyDvN5qlgbSVh0vcxAC1e2omE3kCAYh_PaE",
 	authDomain: "ktb-hackerton.firebaseapp.com",

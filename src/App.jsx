@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { ArrowUp } from 'lucide-react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ProjectList from './components/ProjectList';
-import RegisterModal from './components/RegisterModal';
-import PasswordModal from './components/PasswordModal';
-import ProjectDetailModal from './components/ProjectDetailModal';
 import Toast from './components/Toast';
 import { subscribeToProjects, verifyProjectPassword } from './lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
+
+// Lazy Load Modals
+const RegisterModal = React.lazy(() => import('./components/RegisterModal'));
+const PasswordModal = React.lazy(() => import('./components/PasswordModal'));
+const ProjectDetailModal = React.lazy(() => import('./components/ProjectDetailModal'));
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -176,29 +178,31 @@ function App() {
       </main>
 
       {/* Detail Modal */}
-      <ProjectDetailModal
-        project={selectedProject}
-        isOpen={!!selectedProject}
-        onClose={() => setSelectedProject(null)}
-        showToast={showToast}
-        onCommentSuccess={(msg) => showToast(msg, 'success')}
-      />
+      <Suspense fallback={null}>
+        <ProjectDetailModal
+          project={selectedProject}
+          isOpen={!!selectedProject}
+          onClose={() => setSelectedProject(null)}
+          showToast={showToast}
+          onCommentSuccess={(msg) => showToast(msg, 'success')}
+        />
 
-      <RegisterModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        initialData={editingProject}
-        onSuccess={(msg) => showToast(msg)}
-        defaultGeneration={selectedGeneration}
-      />
+        <RegisterModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          initialData={editingProject}
+          onSuccess={(msg) => showToast(msg)}
+          defaultGeneration={selectedGeneration}
+        />
 
-      <PasswordModal
-        isOpen={isPasswordModalOpen}
-        onClose={() => setIsPasswordModalOpen(false)}
-        onVerify={handlePasswordVerified}
-        title="프로젝트 수정"
-        description="프로젝트 정보를 수정하려면 비밀번호를 입력하세요."
-      />
+        <PasswordModal
+          isOpen={isPasswordModalOpen}
+          onClose={() => setIsPasswordModalOpen(false)}
+          onVerify={handlePasswordVerified}
+          title="프로젝트 수정"
+          description="프로젝트 정보를 수정하려면 비밀번호를 입력하세요."
+        />
+      </Suspense>
 
       <AnimatePresence>
         {toastMessage && (
