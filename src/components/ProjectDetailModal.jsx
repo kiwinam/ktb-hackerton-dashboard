@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { X, Send, Trash2, Calendar, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addComment, subscribeToComments, deleteComment } from '../lib/firebase';
@@ -134,9 +137,9 @@ const ProjectDetailModal = ({ project, isOpen, onClose }) => {
 											))}
 										</div>
 
-										<p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-lg mb-8">
-											{project.description}
-										</p>
+										<div className="prose prose-sm max-w-none text-gray-700 leading-relaxed mb-8 break-keep">
+											<ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{project.description}</ReactMarkdown>
+										</div>
 
 										<div className="bg-white p-4 rounded-xl border border-gray-200">
 											<h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">

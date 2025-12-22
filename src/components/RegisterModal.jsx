@@ -263,16 +263,16 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 
 									<div>
 										<label className="block text-sm font-medium text-gray-700 mb-1">
-											한줄 소개 *
+											상세 소개 (Markdown 지원) *
 										</label>
 										<textarea
 											name="description"
 											required
 											value={formData.description}
 											onChange={handleChange}
-											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all resize-none h-24"
-											placeholder="어떤 서비스인가요? (최대 300자)"
-											maxLength={300}
+											className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all resize-none h-48 font-mono text-sm"
+											placeholder="프로젝트에 대해 자세히 설명해주세요. 마크다운 문법을 지원합니다. (최대 3000자)"
+											maxLength={3000}
 										/>
 									</div>
 
