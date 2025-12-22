@@ -282,15 +282,20 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 													/>
 												</div>
 												<div className="flex gap-2">
-													<input
-														type="text"
-														placeholder="응원의 댓글을 남겨주세요! (최대 100자, 비속어 금지)"
-														value={newComment}
-														onChange={(e) => setNewComment(e.target.value)}
-														required
-														maxLength={100}
-														className="flex-1 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
-													/>
+													<div className="flex-1 relative">
+														<input
+															type="text"
+															placeholder="응원의 댓글을 남겨주세요! (최대 100자, 비속어 금지)"
+															value={newComment}
+															onChange={(e) => setNewComment(e.target.value)}
+															required
+															maxLength={100}
+															className="w-full pl-4 pr-16 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
+														/>
+														<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500 font-medium">
+															{newComment.length}/100
+														</span>
+													</div>
 													<button
 														type="submit"
 														disabled={isSubmitting}
@@ -318,13 +323,18 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 																	<span className="font-bold text-sm text-gray-900">{comment.author}</span>
 																	<span className="text-xs text-kakao-brown font-bold animate-pulse">수정 중...</span>
 																</div>
-																<textarea
-																	value={editContent}
-																	onChange={(e) => setEditContent(e.target.value)}
-																	className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
-																	rows={3}
-																	maxLength={100}
-																/>
+																<div className="relative">
+																	<textarea
+																		value={editContent}
+																		onChange={(e) => setEditContent(e.target.value)}
+																		className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-kakao-yellow text-gray-900 dark:text-white"
+																		rows={3}
+																		maxLength={100}
+																	/>
+																	<span className="absolute right-3 bottom-3 text-xs text-gray-400 dark:text-gray-500 font-medium bg-white/80 dark:bg-gray-800/80 px-1 rounded">
+																		{editContent.length}/100
+																	</span>
+																</div>
 																<div className="flex justify-end gap-2 mt-2">
 																	<button
 																		onClick={handleCancelEdit}
