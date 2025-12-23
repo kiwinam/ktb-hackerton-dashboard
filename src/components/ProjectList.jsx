@@ -34,7 +34,7 @@ const ProjectList = ({ projects, onEdit, onCardClick }) => {
 			className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
 		>
 			{projects.map((project) => (
-				<ProjectCard key={project.id} project={project} onEdit={onEdit} onClick={() => onCardClick(project)} />
+				<ProjectCard key={project.id} project={project} onEdit={onEdit} onClick={onCardClick} />
 			))}
 		</motion.div>
 	);

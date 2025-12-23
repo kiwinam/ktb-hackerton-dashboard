@@ -1,8 +1,9 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { ArrowUp } from 'lucide-react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ProjectList from './components/ProjectList';
+import ProjectCardSkeleton from './components/ProjectCardSkeleton';
 import Toast from './components/Toast';
 import { subscribeToProjects, verifyProjectPassword } from './lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -79,10 +80,10 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleEditClick = (project) => {
+  const handleEditClick = useCallback((project) => {
     setPendingEditProject(project);
     setIsPasswordModalOpen(true);
-  };
+  }, []);
 
   const handlePasswordVerified = async (inputPassword) => {
     if (pendingEditProject) {
@@ -99,10 +100,10 @@ function App() {
     return false;
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setEditingProject(null);
-  };
+  }, []);
 
   const showToast = (msg, type = 'success') => {
     setToastMessage(msg);
@@ -116,19 +117,21 @@ function App() {
 
   // ... (existing code)
 
-  const sortedProjects = [...projects]
-    .filter(p => (p.generation || 3) === selectedGeneration) // Filter by generation (default to 3)
-    .sort((a, b) => {
-      if (sortBy === 'likes') {
-        const likesA = a.likes || 0;
-        const likesB = b.likes || 0;
-        if (likesA !== likesB) return likesB - likesA;
-      }
-      // Default to latest (createdAt)
-      const dateA = a.createdAt?.seconds || 0;
-      const dateB = b.createdAt?.seconds || 0;
-      return dateB - dateA;
-    });
+  const sortedProjects = React.useMemo(() => {
+    return [...projects]
+      .filter(p => (p.generation || 3) === selectedGeneration) // Filter by generation (default to 3)
+      .sort((a, b) => {
+        if (sortBy === 'likes') {
+          const likesA = a.likes || 0;
+          const likesB = b.likes || 0;
+          if (likesA !== likesB) return likesB - likesA;
+        }
+        // Default to latest (createdAt)
+        const dateA = a.createdAt?.seconds || 0;
+        const dateB = b.createdAt?.seconds || 0;
+        return dateB - dateA;
+      });
+  }, [projects, selectedGeneration, sortBy]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-200 flex flex-col">
@@ -165,8 +168,10 @@ function App() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-kakao-yellow"></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <ProjectCardSkeleton key={i} />
+            ))}
           </div>
         ) : (
           <ProjectList
