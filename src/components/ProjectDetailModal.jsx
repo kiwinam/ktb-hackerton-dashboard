@@ -6,7 +6,7 @@ import { X, Send, Trash2, Calendar, User, Edit2, Check, XCircle, Heart } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword, subscribeToDeployments, addDeploymentLog, deleteDeploymentLog, verifyProjectPassword, getDeploymentCount, updateDeploymentLog, toggleLike } from '../lib/firebase';
 import PasswordModal from './PasswordModal';
-import { trackLikeProject, trackProjectLinkClick, trackAddComment, trackDeleteComment, trackViewMoreDeployments } from '../lib/analytics';
+import { trackLikeProject, trackProjectLinkClick, trackAddComment, trackDeleteComment, trackViewMoreDeployments, trackProfanityBlock, trackAddDeploymentLog, trackDeleteDeploymentLog } from '../lib/analytics';
 import ConfirmModal from './ConfirmModal';
 import { checkProfanity } from '../lib/profanityFilter';
 import ImageWithLoader from './ImageWithLoader';
@@ -140,6 +140,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 		// Profanity Check
 		// Profanity Check
 		if (checkProfanity(newComment)) {
+			trackProfanityBlock(project.id, project.title, authorName);
 			alert("비속어가 포함된 댓글은 등록할 수 없습니다. 바르고 고운 말을 써주세요! 😊");
 			return;
 		}
@@ -288,6 +289,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 			if (showToast) showToast("댓글이 삭제되었습니다!", 'success');
 		} else if (passwordModalMode === 'delete_deployment' && deleteTargetId) {
 			// Confirm delete deployment
+			trackDeleteDeploymentLog(project.id, project.title);
 			await deleteDeploymentLog(project.id, deleteTargetId);
 			setDeleteTargetId(null);
 			setPasswordModalMode('delete'); // Reset to default
@@ -310,6 +312,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 		});
 
 		if (result.success) {
+			trackAddDeploymentLog(project.id, project.title, newVersion);
 			setIsAddingDeployment(false);
 			setNewVersion('');
 			setNewLogContent('');

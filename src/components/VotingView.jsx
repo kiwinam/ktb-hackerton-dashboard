@@ -9,7 +9,7 @@ import {
 	Crown, Medal, Shield, Eye, Play, Square, Info, Calendar
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
-import { trackVoteMatchup, logCustomEvent, trackVoterAuth, trackVoterLogout } from '../lib/analytics';
+import { trackVoteMatchup, logCustomEvent, trackVoterAuth, trackVoterLogout, logScreenView } from '../lib/analytics';
 import {
 	getVotingSettings,
 	saveVotingSettings,
@@ -110,6 +110,12 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 			loadVoterVotes();
 		}
 	}, [voter, settings.generation]);
+
+	useEffect(() => {
+		if (activeTab) {
+			logScreenView(`voting_${activeTab}_tab`);
+		}
+	}, [activeTab]);
 
 
 
@@ -324,6 +330,7 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 	const handleResetSkipped = () => {
 		setSkippedPairs(new Set());
 		setCurrentPair(null);
+		logCustomEvent('reset_skipped_matchups');
 	};
 
 	const handleSaveAdminSettings = async (e) => {

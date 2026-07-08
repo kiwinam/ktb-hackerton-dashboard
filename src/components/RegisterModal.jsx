@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Loader2, Sparkles, Wand2, Upload, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addProject, updateProject, uploadThumbnailFromUrl, uploadThumbnailFromFile, getStudentsByGeneration } from '../lib/firebase';
-import { trackProjectRegister, trackProjectEdit, trackModalCancel, logScreenView } from '../lib/analytics';
+import { trackProjectRegister, trackProjectEdit, trackModalCancel, logScreenView, trackSelectRegisterCourseTab, trackAddTag, trackRemoveTag, trackFetchOgImage } from '../lib/analytics';
 import ImageWithLoader from './ImageWithLoader';
 
 const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, defaultGeneration = 4, generations = [], projects = [] }) => {
@@ -122,6 +122,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 					...prev,
 					tags: [...prev.tags, newTag]
 				}));
+				trackAddTag(newTag);
 				setTagInput('');
 			} else if (formData.tags.length >= 3) {
 				alert('태그는 최대 3개까지만 등록 가능합니다.');
@@ -134,6 +135,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 			...prev,
 			tags: prev.tags.filter(tag => tag !== tagToRemove)
 		}));
+		trackRemoveTag(tagToRemove);
 	};
 
 	const fetchOgImage = async () => {
@@ -152,12 +154,15 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 				// URL로 이미지를 가져온 경우 파일 선택 초기화
 				setImageFile(null);
 				setImagePreview('');
+				trackFetchOgImage(true, formData.url);
 			} else {
 				alert('이미지를 찾을 수 없습니다. 직접 입력해주세요.');
+				trackFetchOgImage(false, formData.url);
 			}
 		} catch (error) {
 			console.error("OG Fetch Error:", error);
 			alert('이미지 정보를 불러오는데 실패했습니다.');
+			trackFetchOgImage(false, formData.url);
 		} finally {
 			setFetchingOg(false);
 		}
@@ -372,7 +377,10 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 												<button
 													key={course}
 													type="button"
-													onClick={() => setMemberCourseTab(course)}
+													onClick={() => {
+														setMemberCourseTab(course);
+														trackSelectRegisterCourseTab(course);
+													}}
 													className={`px-3 py-1.5 text-xs font-bold border-b-2 transition-all ${memberCourseTab === course
 														? 'border-yellow-500 text-yellow-600 dark:text-yellow-400'
 														: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'

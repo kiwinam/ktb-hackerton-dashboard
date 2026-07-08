@@ -164,3 +164,45 @@ export const trackViewMoreDeployments = (projectId, projectTitle) => {
 		project_title: projectTitle
 	});
 };
+
+export const trackSelectRegisterCourseTab = (course) => {
+	logCustomEvent('select_register_course_tab', { course: course });
+};
+
+export const trackAddTag = (tag) => {
+	logCustomEvent('add_tag', { tag: tag });
+};
+
+export const trackRemoveTag = (tag) => {
+	logCustomEvent('remove_tag', { tag: tag });
+};
+
+export const trackFetchOgImage = (success, url) => {
+	logCustomEvent('fetch_og_image', {
+		success: success,
+		url: url
+	});
+};
+
+export const trackProfanityBlock = (projectId, projectTitle, author) => {
+	logCustomEvent('comment_profanity_blocked', {
+		project_id: projectId,
+		project_title: projectTitle,
+		author: author
+	});
+};
+
+export const trackAddDeploymentLog = (projectId, projectTitle, version) => {
+	logCustomEvent('add_deployment_log', {
+		project_id: projectId,
+		project_title: projectTitle,
+		version: version
+	});
+};
+
+export const trackDeleteDeploymentLog = (projectId, projectTitle) => {
+	logCustomEvent('delete_deployment_log', {
+		project_id: projectId,
+		project_title: projectTitle
+	});
+};
