@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, useCallback } from 'react';
+import { logScreenView, trackProjectView } from './lib/analytics';
 import { ArrowUp } from 'lucide-react';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -147,6 +148,17 @@ function App() {
       setStudents(list);
     });
   }, [selectedGeneration]);
+
+  useEffect(() => {
+    logScreenView(view);
+  }, [view]);
+
+  useEffect(() => {
+    if (selectedProject) {
+      logScreenView('project_detail', selectedProject.title);
+      trackProjectView(selectedProject.id, selectedProject.title, selectedProject.team);
+    }
+  }, [selectedProject]);
 
   const handleViewChange = useCallback((newView) => {
     setView(newView);

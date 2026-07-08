@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ExternalLink, Edit2, Heart, MessageCircle } from 'lucide-react';
 import { toggleLike } from '../lib/firebase';
 import ImageWithLoader from './ImageWithLoader';
+import { trackLikeProject, trackProjectLinkClick } from '../lib/analytics';
 
 const ProjectCard = ({ project, onEdit, onClick, students = [] }) => {
 	const [isLiking, setIsLiking] = useState(false);
@@ -25,6 +26,7 @@ const ProjectCard = ({ project, onEdit, onClick, students = [] }) => {
 		if (isLiking) return;
 
 		setIsLiking(true);
+		trackLikeProject(project.id, project.title, !isLiked);
 		await toggleLike(project.id, sessionId);
 		setIsLiking(false);
 	};
@@ -201,7 +203,10 @@ const ProjectCard = ({ project, onEdit, onClick, students = [] }) => {
 						href={project.url}
 						target="_blank"
 						rel="noopener noreferrer"
-						onClick={(e) => e.stopPropagation()}
+						onClick={(e) => {
+							e.stopPropagation();
+							trackProjectLinkClick(project.id, project.title, project.url);
+						}}
 						className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-gray-50 dark:bg-gray-700 hover:bg-kakao-yellow dark:hover:bg-kakao-yellow hover:text-kakao-black dark:text-gray-300 dark:hover:text-kakao-black text-gray-700 rounded-lg text-sm font-bold transition-colors"
 					>
 						<span>보러가기</span>

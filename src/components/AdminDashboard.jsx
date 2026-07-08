@@ -7,6 +7,7 @@ import {
 	Vote, ToggleLeft, ToggleRight, Plus, Upload
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
+import { trackProjectEdit, trackProjectDelete, trackVotingSettingsSave } from '../lib/analytics';
 
 import {
 	getStudentsByGeneration,
@@ -597,6 +598,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 
 			const result = await updateProject(projectEditTarget.id, submissionData);
 			if (!result.success) throw new Error('update failed');
+			trackProjectEdit(projectEditTarget.id, submissionData.title, submissionData.team);
 			if (projectEditNewPw.trim()) {
 				const pwResult = await adminUpdateProjectPassword(projectEditTarget.id, projectEditNewPw.trim());
 				if (!pwResult.success) throw new Error('password update failed');
@@ -619,6 +621,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 		try {
 			const result = await adminDeleteProject(project.id);
 			if (result.success) {
+				trackProjectDelete(project.id, project.title);
 				showToast('프로젝트가 삭제되었습니다.', 'success');
 				if (projectEditTarget?.id === project.id) {
 					setProjectEditTarget(null);
@@ -637,6 +640,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 		try {
 			const result = await saveVotingSettings(adminVotingSettings);
 			if (result.success) {
+				trackVotingSettingsSave(adminVotingSettings.generation, adminVotingSettings.isActive);
 				showToast('투표 설정이 저장되었습니다.', 'success');
 			} else {
 				showToast('투표 설정 저장에 실패했습니다.', 'error');

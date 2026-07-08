@@ -9,6 +9,7 @@ import {
 	Crown, Medal, Shield, Eye, Play, Square, Info, Calendar
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
+import { trackVoteMatchup, logCustomEvent } from '../lib/analytics';
 import {
 	getVotingSettings,
 	saveVotingSettings,
@@ -268,6 +269,10 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 		if (!voter || !currentPair) return;
 		const [projA, projB] = currentPair;
 
+		const winnerProj = projA.id === winnerId ? projA : projB;
+		const loserProj = projA.id === winnerId ? projB : projA;
+		trackVoteMatchup(winnerProj.id, winnerProj.title, loserProj.id, loserProj.title);
+
 		const newVote = {
 			projectA: projA.id,
 			projectB: projB.id,
@@ -295,6 +300,14 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 
 	const handleSkipPair = () => {
 		if (!currentPair) return;
+
+		logCustomEvent('skip_matchup', {
+			project_a_id: currentPair[0].id,
+			project_a_title: currentPair[0].title,
+			project_b_id: currentPair[1].id,
+			project_b_title: currentPair[1].title
+		});
+
 		const key = [currentPair[0].id, currentPair[1].id].sort().join('_');
 		setSkippedPairs(prev => {
 			const next = new Set(prev);

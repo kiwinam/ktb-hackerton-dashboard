@@ -6,6 +6,7 @@ import { X, Send, Trash2, Calendar, User, Edit2, Check, XCircle, Heart } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword, subscribeToDeployments, addDeploymentLog, deleteDeploymentLog, verifyProjectPassword, getDeploymentCount, updateDeploymentLog, toggleLike } from '../lib/firebase';
 import PasswordModal from './PasswordModal';
+import { trackLikeProject, trackProjectLinkClick, trackAddComment, trackDeleteComment } from '../lib/analytics';
 import ConfirmModal from './ConfirmModal';
 import { checkProfanity } from '../lib/profanityFilter';
 import ImageWithLoader from './ImageWithLoader';
@@ -79,6 +80,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 
 		setIsLiking(true);
 		try {
+			trackLikeProject(project.id, project.title, !isLiked);
 			await toggleLike(project.id, sessionId);
 		} catch (error) {
 			console.error("Error toggling like:", error);
@@ -151,6 +153,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 		setIsSubmitting(false);
 
 		if (result.success) {
+			trackAddComment(project.id, project.title, authorName);
 			setNewComment('');
 			// Optional: Keep author name/password for convenience or clear them? 
 			// Let's keep author name, clear password for security habit, though for hackathon convenience maybe keep?
@@ -180,6 +183,10 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 			const result = await verifyCommentPassword(project.id, deleteTargetId, inputPassword, sessionId);
 			if (result.success) {
 				if (window.confirm("정말로 댓글을 삭제하시겠습니까?")) {
+					const commentToDelete = comments.find(c => c.id === deleteTargetId);
+					const author = commentToDelete ? commentToDelete.author : '알 수 없음';
+					trackDeleteComment(project.id, project.title, author);
+
 					await deleteComment(project.id, deleteTargetId, inputPassword);
 					setIsPasswordModalOpen(false);
 					setDeleteTargetId(null);
@@ -271,6 +278,10 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 
 	const handleConfirmDelete = async () => {
 		if (deleteTargetId && pendingDeletePassword) {
+			const commentToDelete = comments.find(c => c.id === deleteTargetId);
+			const author = commentToDelete ? commentToDelete.author : '알 수 없음';
+			trackDeleteComment(project.id, project.title, author);
+
 			await deleteComment(project.id, deleteTargetId, pendingDeletePassword);
 			setDeleteTargetId(null);
 			setPendingDeletePassword(null);
@@ -439,7 +450,13 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 										</div>
 
 										<div className="mt-6">
-											<a href={project.url} target="_blank" rel="noopener noreferrer" className="block w-full bg-kakao-yellow text-kakao-black text-center py-3 rounded-xl font-bold hover:bg-yellow-400 transition-colors">
+											<a 
+												href={project.url} 
+												target="_blank" 
+												rel="noopener noreferrer" 
+												onClick={() => trackProjectLinkClick(project.id, project.title, project.url)}
+												className="block w-full bg-kakao-yellow text-kakao-black text-center py-3 rounded-xl font-bold hover:bg-yellow-400 transition-colors"
+											>
 												서비스 보러가기
 											</a>
 										</div>

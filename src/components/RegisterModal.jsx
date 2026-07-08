@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Loader2, Sparkles, Wand2, Upload, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addProject, updateProject, uploadThumbnailFromUrl, uploadThumbnailFromFile, getStudentsByGeneration } from '../lib/firebase';
+import { trackProjectRegister, trackProjectEdit } from '../lib/analytics';
 import ImageWithLoader from './ImageWithLoader';
 
 const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, defaultGeneration = 4, generations = [], projects = [] }) => {
@@ -215,6 +216,11 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 		setLoading(false);
 
 		if (result.success) {
+			if (initialData) {
+				trackProjectEdit(initialData.id, submissionData.title, submissionData.team);
+			} else {
+				trackProjectRegister(submissionData.generation, submissionData.title, submissionData.team);
+			}
 			if (onSuccess) onSuccess(initialData ? '프로젝트가 수정되었습니다!' : '프로젝트가 등록되었습니다!');
 			onClose();
 		} else {
