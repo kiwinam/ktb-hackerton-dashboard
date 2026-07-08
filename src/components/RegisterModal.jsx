@@ -310,7 +310,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
 											팀원 매핑 (수강생 목록) *
 										</label>
-										
+
 										{/* 선택된 팀원 칩 목록 */}
 										{formData.members && formData.members.length > 0 && (
 											<div className="flex flex-wrap gap-1.5 mb-3 p-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -319,7 +319,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 													const student = students.find(s => s.name === memberName);
 													const displayName = student ? student.name : memberName;
 													const courseName = student ? student.course : "미등록";
-													
+
 													let colorClass = "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-850 dark:text-gray-300 dark:border-gray-700";
 													if (student) {
 														if (student.course === "풀스택") {
@@ -356,11 +356,10 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 													key={course}
 													type="button"
 													onClick={() => setMemberCourseTab(course)}
-													className={`px-3 py-1.5 text-xs font-bold border-b-2 transition-all ${
-														memberCourseTab === course
-															? 'border-yellow-500 text-yellow-600 dark:text-yellow-400'
-															: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-													}`}
+													className={`px-3 py-1.5 text-xs font-bold border-b-2 transition-all ${memberCourseTab === course
+														? 'border-yellow-500 text-yellow-600 dark:text-yellow-400'
+														: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+														}`}
 												>
 													{course}
 												</button>
@@ -382,7 +381,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 										<div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900 max-h-40 overflow-y-auto grid grid-cols-2 gap-2">
 											{(() => {
 												const courseStudents = students.filter(s => s.course === memberCourseTab);
-												const searchedStudents = courseStudents.filter(s => 
+												const searchedStudents = courseStudents.filter(s =>
 													s.name.toLowerCase().includes(memberSearchQuery.toLowerCase())
 												);
 												const sortedStudents = [...searchedStudents].sort((a, b) => {
@@ -392,20 +391,19 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 													if (!aIsTaken && bIsTaken) return -1;
 													return 0;
 												});
-												
+
 												return sortedStudents.map(student => {
 													const isMember = (formData.members || []).includes(student.name);
 													const isTaken = otherTeamsMembers.has(student.name);
 													return (
 														<label
 															key={student.id}
-															className={`flex items-center gap-2 text-sm p-1.5 rounded transition-all border ${
-																isTaken
-																	? 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-transparent cursor-not-allowed opacity-60'
-																	: isMember
-																		? 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400 font-bold border border-yellow-100 dark:border-yellow-900/30 cursor-pointer'
-																		: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent cursor-pointer'
-															}`}
+															className={`flex items-center gap-2 text-sm p-1.5 rounded transition-all border ${isTaken
+																? 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-transparent cursor-not-allowed opacity-60'
+																: isMember
+																	? 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400 font-bold border border-yellow-100 dark:border-yellow-900/30 cursor-pointer'
+																	: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent cursor-pointer'
+																}`}
 														>
 															<input
 																type="checkbox"
@@ -436,7 +434,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 												});
 											})()}
 										</div>
-										<p className="text-[10px] text-gray-400 mt-1">* 지정된 수강생은 ELO 투표 시 본인 프로젝트가 매치업 후보에서 제외됩니다.</p>
+										<p className="text-[12px] text-gray-400 mt-1">* 지정된 수강생은 투표 시 본인 프로젝트가 매치업 후보에서 제외됩니다.</p>
 									</div>
 
 									<div>
@@ -536,7 +534,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 											value={formData.imageUrl}
 											onChange={handleChange}
 											className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-											placeholder="자동으로 가져오거나 직접 입력하세요 (이미지 썸네일 처리 미지원)"
+											placeholder="URL 에서 가져오거나, 업로드해주세요"
 										/>
 										{/* 파일 업로드 영역 */}
 										<div className="mt-2">

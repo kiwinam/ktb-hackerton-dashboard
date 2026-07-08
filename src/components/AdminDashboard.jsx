@@ -1312,7 +1312,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 									{/* 팀원 매핑 수정 영역 */}
 									<div>
 										<label className="block text-xs font-bold text-gray-400 mb-1">팀원 매핑 (수강생 목록)</label>
-										
+
 										{/* 선택된 팀원 칩 목록 */}
 										{projectEditData.members && projectEditData.members.length > 0 && (
 											<div className="flex flex-wrap gap-1.5 mb-2.5 p-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -1321,7 +1321,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 													const student = students.find(s => s.name === memberName);
 													const displayName = student ? student.name : memberName;
 													const courseName = student ? student.course : "미등록";
-													
+
 													let colorClass = "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700";
 													if (student) {
 														if (student.course === "풀스택") {
@@ -1358,11 +1358,10 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 													key={course}
 													type="button"
 													onClick={() => setMemberCourseTab(course)}
-													className={`px-3 py-1.5 text-xs font-bold border-b-2 transition-all ${
-														memberCourseTab === course
+													className={`px-3 py-1.5 text-xs font-bold border-b-2 transition-all ${memberCourseTab === course
 															? 'border-purple-500 text-purple-600 dark:text-purple-400'
 															: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-													}`}
+														}`}
 												>
 													{course}
 												</button>
@@ -1384,7 +1383,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 										<div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900 max-h-40 overflow-y-auto grid grid-cols-2 gap-2">
 											{(() => {
 												const courseStudents = students.filter(s => s.course === memberCourseTab);
-												const searchedStudents = courseStudents.filter(s => 
+												const searchedStudents = courseStudents.filter(s =>
 													s.name.toLowerCase().includes(memberSearchQuery.toLowerCase())
 												);
 												const sortedStudents = [...searchedStudents].sort((a, b) => {
@@ -1394,20 +1393,19 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 													if (!aIsTaken && bIsTaken) return -1;
 													return 0;
 												});
-												
+
 												return sortedStudents.map(student => {
 													const isMember = (projectEditData.members || []).includes(student.name);
 													const isTaken = otherTeamsMembers.has(student.name);
 													return (
 														<label
 															key={student.id}
-															className={`flex items-center gap-2 text-sm p-1.5 rounded transition-all border ${
-																isTaken
+															className={`flex items-center gap-2 text-sm p-1.5 rounded transition-all border ${isTaken
 																	? 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-transparent cursor-not-allowed opacity-60'
 																	: isMember
 																		? 'bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 font-bold border border-purple-100 dark:border-purple-900/30 cursor-pointer'
 																		: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent cursor-pointer'
-															}`}
+																}`}
 														>
 															<input
 																type="checkbox"
@@ -1438,7 +1436,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 												});
 											})()}
 										</div>
-										<p className="text-[10px] text-gray-400 mt-1">* 지정된 수강생은 ELO 투표 시 본인 프로젝트가 매치업 후보에서 제외됩니다.</p>
+										<p className="text-[12px] text-gray-400 mt-1">* 지정된 수강생은 투표 시 본인 프로젝트가 매치업 후보에서 제외됩니다.</p>
 									</div>
 									<div>
 										<label className="block text-xs font-bold text-gray-400 mb-1">새 프로젝트 비밀번호 <span className="text-[11px] text-gray-400 font-normal">(변경할 때만 작성)</span></label>
