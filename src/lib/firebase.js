@@ -695,7 +695,7 @@ export const verifyStudentVoter = async (generation, course, name, birthdate) =>
 			collection(db, "students"),
 			where("generation", "==", Number(generation)),
 			where("course", "==", course),
-			where("name", "==", name.trim()),
+			where("kor_name", "==", name.trim()),
 			where("birthdate", "==", birthdate.trim())
 		);
 		const snap = await getDocs(q);

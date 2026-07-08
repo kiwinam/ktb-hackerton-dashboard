@@ -200,7 +200,7 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 	const activeGenProjects = useMemo(() => {
 		let list = projects.filter(p => (p.generation || 3) === settings.generation);
 		if (voter && !voter.isAdmin) {
-			list = list.filter(p => !(p.members || []).includes(voter.email));
+			list = list.filter(p => !(p.members || []).includes(voter.email) && !(p.members || []).includes(voter.name));
 		}
 		return list;
 	}, [projects, settings.generation, voter]);
