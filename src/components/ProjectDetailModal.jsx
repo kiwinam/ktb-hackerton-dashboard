@@ -6,7 +6,7 @@ import { X, Send, Trash2, Calendar, User, Edit2, Check, XCircle, Heart } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 import { addComment, subscribeToComments, deleteComment, updateComment, verifyCommentPassword, subscribeToDeployments, addDeploymentLog, deleteDeploymentLog, verifyProjectPassword, getDeploymentCount, updateDeploymentLog, toggleLike } from '../lib/firebase';
 import PasswordModal from './PasswordModal';
-import { trackLikeProject, trackProjectLinkClick, trackAddComment, trackDeleteComment } from '../lib/analytics';
+import { trackLikeProject, trackProjectLinkClick, trackAddComment, trackDeleteComment, trackViewMoreDeployments } from '../lib/analytics';
 import ConfirmModal from './ConfirmModal';
 import { checkProfanity } from '../lib/profanityFilter';
 import ImageWithLoader from './ImageWithLoader';
@@ -613,7 +613,10 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 											{/* Show More Button */}
 											{deployments.length < totalDeployments && (
 												<button
-													onClick={() => setDeployLimit(prev => prev + SHOW_MORE_COUNT)}
+													onClick={() => {
+														setDeployLimit(prev => prev + SHOW_MORE_COUNT);
+														trackViewMoreDeployments(project.id, project.title);
+													}}
 													className="w-full py-2 text-xs font-bold text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-dashed border-gray-200 dark:border-gray-600"
 												>
 													더보기 ({totalDeployments - deployments.length}개 남음)

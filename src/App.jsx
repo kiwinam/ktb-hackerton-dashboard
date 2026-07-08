@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, useCallback } from 'react';
-import { logScreenView, trackProjectView } from './lib/analytics';
+import { logScreenView, trackProjectView, trackThemeToggle, trackGenerationChange, trackSortChange } from './lib/analytics';
 import { ArrowUp } from 'lucide-react';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -50,7 +50,9 @@ function App() {
   });
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    trackThemeToggle(nextTheme);
   };
 
   useEffect(() => {
@@ -204,7 +206,10 @@ function App() {
         theme={theme}
         toggleTheme={toggleTheme}
         selectedGeneration={selectedGeneration}
-        onSelectGeneration={setSelectedGeneration}
+        onSelectGeneration={(gen) => {
+          setSelectedGeneration(gen);
+          trackGenerationChange(gen);
+        }}
         currentView={view}
         onViewChange={handleViewChange}
         generations={generations}
@@ -216,7 +221,10 @@ function App() {
             <div className="flex justify-end mb-6">
               <div className="bg-white dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 inline-flex shadow-sm items-center transition-colors">
                 <button
-                  onClick={() => setSortBy('latest')}
+                  onClick={() => {
+                    setSortBy('latest');
+                    trackSortChange('latest');
+                  }}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${sortBy === 'latest'
                     ? 'bg-kakao-yellow text-kakao-black shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -225,7 +233,10 @@ function App() {
                   등록순
                 </button>
                 <button
-                  onClick={() => setSortBy('likes')}
+                  onClick={() => {
+                    setSortBy('likes');
+                    trackSortChange('likes');
+                  }}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${sortBy === 'likes'
                     ? 'bg-kakao-yellow text-kakao-black shadow-sm'
                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'

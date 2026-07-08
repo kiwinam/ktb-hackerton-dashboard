@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Loader2, Sparkles, Wand2, Upload, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addProject, updateProject, uploadThumbnailFromUrl, uploadThumbnailFromFile, getStudentsByGeneration } from '../lib/firebase';
-import { trackProjectRegister, trackProjectEdit } from '../lib/analytics';
+import { trackProjectRegister, trackProjectEdit, trackModalCancel, logScreenView } from '../lib/analytics';
 import ImageWithLoader from './ImageWithLoader';
 
 const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, defaultGeneration = 4, generations = [], projects = [] }) => {
@@ -41,6 +41,17 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 			});
 		return set;
 	}, [projects, formData.generation, initialData]);
+
+	const handleCancel = () => {
+		trackModalCancel(initialData ? 'edit_project_modal' : 'register_project_modal');
+		onClose();
+	};
+
+	useEffect(() => {
+		if (isOpen) {
+			logScreenView(initialData ? 'edit_project_modal' : 'register_project_modal');
+		}
+	}, [isOpen, initialData]);
 
 	// Reset or populate form when opening/closing
 	useEffect(() => {
@@ -236,7 +247,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
-						onClick={onClose}
+						onClick={handleCancel}
 						className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
 					/>
 					<motion.div
@@ -251,7 +262,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 									{initialData ? '프로젝트 수정' : '새 프로젝트 등록'}
 								</h2>
 								<button
-									onClick={onClose}
+									onClick={handleCancel}
 									className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400"
 								>
 									<X className="w-5 h-5" />

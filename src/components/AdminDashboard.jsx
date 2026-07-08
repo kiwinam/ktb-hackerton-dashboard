@@ -7,7 +7,7 @@ import {
 	Vote, ToggleLeft, ToggleRight, Plus, Upload
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
-import { trackProjectEdit, trackProjectDelete, trackVotingSettingsSave } from '../lib/analytics';
+import { trackProjectEdit, trackProjectDelete, trackVotingSettingsSave, trackAdminAuth, trackAdminLogout } from '../lib/analytics';
 
 import {
 	getStudentsByGeneration,
@@ -202,13 +202,16 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 			if (isValid) {
 				setIsAuthorized(true);
 				sessionStorage.setItem('ktb_admin_auth', 'true');
+				trackAdminAuth(true);
 				showToast("관리자 비밀번호 인증 성공!", 'success');
 			} else {
 				setAuthError("비밀번호가 일치하지 않습니다.");
+				trackAdminAuth(false, "incorrect_password");
 			}
 		} catch (error) {
 			console.error("Admin password error:", error);
 			setAuthError("인증 중 오류가 발생했습니다.");
+			trackAdminAuth(false, "auth_error");
 		} finally {
 			setAuthLoading(false);
 		}
@@ -218,6 +221,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 		setIsAuthorized(false);
 		sessionStorage.removeItem('ktb_admin_auth');
 		setSystemPassword('');
+		trackAdminLogout();
 		showToast("로그아웃 되었습니다.", 'success');
 	};
 

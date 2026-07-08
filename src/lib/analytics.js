@@ -109,3 +109,58 @@ export const trackVotingSettingsSave = (generation, isActive) => {
 		is_active: isActive
 	});
 };
+
+export const trackSortChange = (sortBy) => {
+	logCustomEvent('sort_projects', {
+		sort_by: sortBy
+	});
+};
+
+export const trackGenerationChange = (generation) => {
+	logCustomEvent('change_generation', {
+		generation: generation
+	});
+};
+
+export const trackThemeToggle = (theme) => {
+	logCustomEvent('toggle_theme', {
+		theme: theme
+	});
+};
+
+export const trackModalCancel = (modalName) => {
+	logCustomEvent('cancel_modal', {
+		modal_name: modalName
+	});
+};
+
+export const trackVoterAuth = (success, course = '', generation = '', errorReason = '') => {
+	logCustomEvent('voter_auth', {
+		success: success,
+		course: course,
+		generation: generation,
+		error_reason: errorReason
+	});
+};
+
+export const trackVoterLogout = () => {
+	logCustomEvent('voter_logout');
+};
+
+export const trackAdminAuth = (success, errorReason = '') => {
+	logCustomEvent('admin_auth', {
+		success: success,
+		error_reason: errorReason
+	});
+};
+
+export const trackAdminLogout = () => {
+	logCustomEvent('admin_logout');
+};
+
+export const trackViewMoreDeployments = (projectId, projectTitle) => {
+	logCustomEvent('view_more_deployments', {
+		project_id: projectId,
+		project_title: projectTitle
+	});
+};

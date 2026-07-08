@@ -9,7 +9,7 @@ import {
 	Crown, Medal, Shield, Eye, Play, Square, Info, Calendar
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
-import { trackVoteMatchup, logCustomEvent } from '../lib/analytics';
+import { trackVoteMatchup, logCustomEvent, trackVoterAuth, trackVoterLogout } from '../lib/analytics';
 import {
 	getVotingSettings,
 	saveVotingSettings,
@@ -151,15 +151,18 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 				const voterData = res.voter;
 				setVoter(voterData);
 				localStorage.setItem('ktb_voter', JSON.stringify(voterData));
+				trackVoterAuth(true, selectedCourse, settings.generation);
 				showToast(`${voterData.name}님, 인증되었습니다.`, 'success');
 				setVoterName('');
 				setBirthdate('');
 			} else {
 				setAuthError(res.error);
+				trackVoterAuth(false, selectedCourse, settings.generation, res.error);
 			}
 		} catch (error) {
 			console.error("Student auth error:", error);
 			setAuthError("인증 중 오류가 발생했습니다. 다시 시도해주세요.");
+			trackVoterAuth(false, selectedCourse, settings.generation, "auth_error");
 		} finally {
 			setAuthLoading(false);
 		}
@@ -171,6 +174,7 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 		setVoterVotes([]);
 		setCurrentPair(null);
 		setSkippedPairs(new Set());
+		trackVoterLogout();
 		showToast("로그아웃되었습니다.", 'success');
 	};
 
