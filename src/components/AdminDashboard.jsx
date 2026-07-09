@@ -860,14 +860,14 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 			{
 				key: 'generations',
 				icon: Calendar,
-				label: '갤러리 기수 수정',
+				label: '기수 관리',
 				desc: 'AI 해커톤 갤러리에 노출되는 기수 목록을 변경하고 표시 순서를 조정합니다.',
 				color: 'blue'
 			},
 			{
 				key: 'password',
 				icon: KeyRound,
-				label: '입장 비밀번호 수정',
+				label: '비밀번호 설정',
 				desc: '대시보드 접속에 필요한 마스터 패스워드를 수정합니다.',
 				color: 'amber'
 			},
@@ -881,14 +881,14 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 			{
 				key: 'voting',
 				icon: Vote,
-				label: '투표 진행 설정',
+				label: '투표 설정',
 				desc: '실시간 해커톤 매치 투표의 기수 설정 및 활성화/예약 상태를 조정합니다.',
 				color: 'green'
 			},
 			{
 				key: 'dashboard',
 				icon: Shield,
-				label: '심층 투표 분석 대시보드',
+				label: '심층 투표 분석',
 				desc: '수강생 투표율, ELO 레이팅 랭킹 및 1대1 대전 매트릭스 로그를 상세 분석합니다.',
 				color: 'indigo'
 			}
@@ -1367,8 +1367,8 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 													type="button"
 													onClick={() => setMemberCourseTab(course)}
 													className={`px-3 py-1.5 text-xs font-bold border-b-2 transition-all ${memberCourseTab === course
-															? 'border-purple-500 text-purple-600 dark:text-purple-400'
-															: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+														? 'border-purple-500 text-purple-600 dark:text-purple-400'
+														: 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
 														}`}
 												>
 													{course}
@@ -1409,10 +1409,10 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 														<label
 															key={student.id}
 															className={`flex items-center gap-2 text-sm p-1.5 rounded transition-all border ${isTaken
-																	? 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-transparent cursor-not-allowed opacity-60'
-																	: isMember
-																		? 'bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 font-bold border border-purple-100 dark:border-purple-900/30 cursor-pointer'
-																		: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent cursor-pointer'
+																? 'bg-gray-100 dark:bg-gray-800/40 text-gray-400 dark:text-gray-600 border-transparent cursor-not-allowed opacity-60'
+																: isMember
+																	? 'bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 font-bold border border-purple-100 dark:border-purple-900/30 cursor-pointer'
+																	: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent cursor-pointer'
 																}`}
 														>
 															<input
