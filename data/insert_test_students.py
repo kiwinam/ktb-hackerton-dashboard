@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--generation",
         type=int,
-        default=4,
+        default=3,
         help="테스트 수강생의 기수 (기본값: 4)",
     )
     parser.add_argument(
