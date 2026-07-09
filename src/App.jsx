@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, useCallback } from 'react';
-import { logScreenView, trackProjectView, trackThemeToggle, trackGenerationChange, trackSortChange } from './lib/analytics';
+import { logScreenView, trackProjectView, trackThemeToggle, trackGenerationChange, trackSortChange, setUserProperties, getDeviceType, getDeviceOS } from './lib/analytics';
 import { ArrowUp } from 'lucide-react';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -75,11 +75,15 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
 
-  // Generate Session ID for Likes if not exists
+  // Generate Session ID for Likes if not exists and set GA user properties
   useEffect(() => {
     if (!localStorage.getItem('hackathon_session_id')) {
       localStorage.setItem('hackathon_session_id', Math.random().toString(36).substring(2, 15));
     }
+    setUserProperties({
+      device_category: getDeviceType(),
+      device_os: getDeviceOS()
+    });
   }, []);
 
   useEffect(() => {

@@ -9,7 +9,7 @@ import {
 	Crown, Medal, Shield, Eye, Play, Square, Info, Calendar
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
-import { trackVoteMatchup, logCustomEvent, trackVoterAuth, trackVoterLogout, logScreenView } from '../lib/analytics';
+import { trackVoteMatchup, logCustomEvent, trackVoterAuth, trackVoterLogout, logScreenView, setUserProperties, getDeviceType, getDeviceOS, parseBirthYear, getAgeGroup } from '../lib/analytics';
 import {
 	getVotingSettings,
 	saveVotingSettings,
@@ -116,6 +116,27 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 			logScreenView(`voting_${activeTab}_tab`);
 		}
 	}, [activeTab]);
+
+	useEffect(() => {
+		if (voter) {
+			const ageGroup = voter.birthdate ? getAgeGroup(parseBirthYear(voter.birthdate)) : 'unknown';
+			setUserProperties({
+				age_group: ageGroup,
+				device_category: getDeviceType(),
+				device_os: getDeviceOS(),
+				course: voter.course,
+				generation: voter.generation
+			});
+		} else {
+			setUserProperties({
+				device_category: getDeviceType(),
+				device_os: getDeviceOS(),
+				age_group: null,
+				course: null,
+				generation: null
+			});
+		}
+	}, [voter]);
 
 
 

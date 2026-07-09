@@ -28,7 +28,7 @@ const uploadToStorage = async (path, thumbBlob) => {
 	const { ref, uploadBytes, getDownloadURL } = await import("firebase/storage");
 	const store = await getStorageInstance();
 	const storageRef = ref(store, path);
-	await uploadBytes(storageRef, thumbBlob, { 
+	await uploadBytes(storageRef, thumbBlob, {
 		contentType: thumbBlob.type,
 		cacheControl: 'public,max-age=31536000'
 	});
@@ -50,7 +50,7 @@ const uploadToStorage = async (path, thumbBlob) => {
  */
 export const uploadThumbnailFromUrl = async (imageUrl, projectId) => {
 	const MAX_SIZE = 640;
-	const QUALITY  = 0.82;
+	const QUALITY = 0.82;
 
 	/**
 	 * 이미지를 fetch해서 Blob으로 반환.
@@ -95,11 +95,11 @@ export const uploadThumbnailFromUrl = async (imageUrl, projectId) => {
 			let { naturalWidth: w, naturalHeight: h } = img;
 			if (w > MAX_SIZE || h > MAX_SIZE) {
 				if (w >= h) { h = Math.round((h * MAX_SIZE) / w); w = MAX_SIZE; }
-				else        { w = Math.round((w * MAX_SIZE) / h); h = MAX_SIZE; }
+				else { w = Math.round((w * MAX_SIZE) / h); h = MAX_SIZE; }
 			}
 
 			const canvas = document.createElement('canvas');
-			canvas.width  = w;
+			canvas.width = w;
 			canvas.height = h;
 			canvas.getContext('2d').drawImage(img, 0, 0, w, h);
 
@@ -124,8 +124,8 @@ export const uploadThumbnailFromUrl = async (imageUrl, projectId) => {
 		// 프록시가 이미 리사이즈한 경우(weserv.nl) Canvas 단계 생략
 		const thumbBlob = alreadyResized ? srcBlob : await resizeBlob(srcBlob);
 
-		const ext        = thumbBlob.type === 'image/webp' ? 'webp' : 'jpg';
-		const path       = `thumbnails/${projectId}/${Date.now()}.${ext}`;
+		const ext = thumbBlob.type === 'image/webp' ? 'webp' : 'jpg';
+		const path = `thumbnails/${projectId}/${Date.now()}.${ext}`;
 		return await uploadToStorage(path, thumbBlob);
 	} catch (error) {
 		console.warn('썸네일 업로드 실패 (원본 URL 유지):', error.message);
@@ -145,7 +145,7 @@ export const uploadThumbnailFromUrl = async (imageUrl, projectId) => {
  */
 export const uploadThumbnailFromFile = async (file, projectId) => {
 	const MAX_SIZE = 640;
-	const QUALITY  = 0.82;
+	const QUALITY = 0.82;
 
 	try {
 		// File → Blob URL (same-origin, CORS 없음)
@@ -160,11 +160,11 @@ export const uploadThumbnailFromFile = async (file, projectId) => {
 				let { naturalWidth: w, naturalHeight: h } = img;
 				if (w > MAX_SIZE || h > MAX_SIZE) {
 					if (w >= h) { h = Math.round((h * MAX_SIZE) / w); w = MAX_SIZE; }
-					else        { w = Math.round((w * MAX_SIZE) / h); h = MAX_SIZE; }
+					else { w = Math.round((w * MAX_SIZE) / h); h = MAX_SIZE; }
 				}
 
 				const canvas = document.createElement('canvas');
-				canvas.width  = w;
+				canvas.width = w;
 				canvas.height = h;
 				canvas.getContext('2d').drawImage(img, 0, 0, w, h);
 
@@ -182,8 +182,8 @@ export const uploadThumbnailFromFile = async (file, projectId) => {
 			img.src = blobUrl;
 		});
 
-		const ext        = thumbBlob.type === 'image/webp' ? 'webp' : 'jpg';
-		const path       = `thumbnails/${projectId}/${Date.now()}.${ext}`;
+		const ext = thumbBlob.type === 'image/webp' ? 'webp' : 'jpg';
+		const path = `thumbnails/${projectId}/${Date.now()}.${ext}`;
 		return await uploadToStorage(path, thumbBlob);
 	} catch (error) {
 		console.warn('파일 썸네일 업로드 실패:', error.message);
@@ -706,7 +706,7 @@ export const verifyStudentVoter = async (generation, course, name, birthdate) =>
 			return {
 				success: true,
 				voter: {
-					email: docSnap.id, 
+					email: docSnap.id,
 					name: studentData.name,
 					course: studentData.course,
 					generation: studentData.generation,
@@ -714,9 +714,9 @@ export const verifyStudentVoter = async (generation, course, name, birthdate) =>
 				}
 			};
 		} else {
-			return { 
-				success: false, 
-				error: "등록된 학생 정보가 없거나 입력한 정보가 정확하지 않습니다. (과정, 이름, 생년월일 6자리를 확인해주세요)" 
+			return {
+				success: false,
+				error: "등록된 학생 정보가 없거나 입력한 정보가 정확하지 않습니다. (과정, 이름, 생년월일 6자리를 확인해주세요)"
 			};
 		}
 	} catch (error) {
@@ -742,7 +742,7 @@ export const seedTestStudents = async () => {
 			{ id: "3_인공지능_최정우_910525", generation: 3, course: "인공지능", name: "최정우", birthdate: "910525", isAdmin: false },
 			{ id: "3_클라우드_정다은_960630", generation: 3, course: "클라우드", name: "정다은", birthdate: "960630", isAdmin: false },
 			{ id: "3_클라우드_강하늘_970714", generation: 3, course: "클라우드", name: "강하늘", birthdate: "970714", isAdmin: false },
-			
+
 			// 4기
 			{ id: "4_풀스택_박지성_930225", generation: 4, course: "풀스택", name: "박지성", birthdate: "930225", isAdmin: false },
 			{ id: "4_풀스택_손흥민_920708", generation: 4, course: "풀스택", name: "손흥민", birthdate: "920708", isAdmin: false },

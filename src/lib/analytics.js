@@ -206,3 +206,54 @@ export const trackDeleteDeploymentLog = (projectId, projectTitle) => {
 		project_title: projectTitle
 	});
 };
+
+/**
+ * Set Google Analytics user properties
+ * @param {Object} properties - User properties (e.g. { age_group: '20s', device_category: 'mobile', course: '인공지능', generation: 4 })
+ */
+export const setUserProperties = (properties) => {
+	if (!isGtagAvailable()) return;
+	window.gtag('set', 'user_properties', properties);
+};
+
+export const getDeviceType = () => {
+	const ua = typeof window !== 'undefined' ? navigator.userAgent : '';
+	if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
+		return 'tablet';
+	}
+	if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i.test(ua)) {
+		return 'mobile';
+	}
+	return 'desktop';
+};
+
+export const getDeviceOS = () => {
+	const ua = typeof window !== 'undefined' ? navigator.userAgent : '';
+	if (/iPad|iPhone|iPod/.test(ua)) return 'iOS';
+	if (/Android/.test(ua)) return 'Android';
+	if (/Macintosh/.test(ua)) return 'macOS';
+	if (/Windows/.test(ua)) return 'Windows';
+	if (/Linux/.test(ua)) return 'Linux';
+	return 'unknown';
+};
+
+export const parseBirthYear = (birthdateStr) => {
+	if (!birthdateStr || birthdateStr.length < 2) return null;
+	const yy = parseInt(birthdateStr.substring(0, 2), 10);
+	if (isNaN(yy)) return null;
+	// Assuming target student group is aged 15-55 (2000s vs 1900s)
+	const year = yy > 35 ? 1900 + yy : 2000 + yy;
+	return year;
+};
+
+export const getAgeGroup = (birthYear) => {
+	if (!birthYear) return 'unknown';
+	const currentYear = new Date().getFullYear();
+	const age = currentYear - birthYear;
+	if (age < 20) return 'under_20';
+	if (age < 25) return '20-24';
+	if (age < 30) return '25-29';
+	if (age < 35) return '30-34';
+	if (age < 40) return '35-39';
+	return '40_and_over';
+};
