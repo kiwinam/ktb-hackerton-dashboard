@@ -202,8 +202,6 @@ def read_students(
             continue
 
         try:
-            if not excel_id:
-                raise ValueError("A열 ID가 비어 있습니다.")
             if not korean_name:
                 raise ValueError("C열 국문명이 비어 있습니다.")
             if not english_name:
@@ -233,7 +231,9 @@ def read_students(
                         "generation": generation,
                         "id": document_id,
                         "isAdmin": False,
+                        "kor_name": korean_name,
                         "name": display_name,
+                        "voteCount": 0,
                     },
                 }
             )
