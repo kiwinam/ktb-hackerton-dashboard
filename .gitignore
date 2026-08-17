@@ -25,3 +25,5 @@ dist-ssr
 
 /data/firebase-service-account.json
 /data/*.xlsx
+/data/*.numbers
+/data/*.csv
