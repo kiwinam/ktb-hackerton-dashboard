@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
 	ArrowLeft, Users, Trophy, CheckCircle2, Clock,
 	Calendar, ChevronRight, RefreshCw, Shield, Lock,
-	Eye, Play, FileText, Check, AlertCircle, Download,
+	Eye, EyeOff, Play, FileText, Check, AlertCircle, Download,
 	Settings, Edit2, Trash2, Save, X, KeyRound, ChevronUp, ChevronDown,
 	Vote, ToggleLeft, ToggleRight, Plus, Upload
 } from 'lucide-react';
@@ -32,7 +32,7 @@ import {
 	db
 } from '../lib/firebase';
 
-const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
+const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToGallery, showToast, onUpdateGenerations }) => {
 	// Project Edit Image Upload & Course Tab State
 	const [projectEditImageFile, setProjectEditImageFile] = useState(null);
 	const [projectEditImagePreview, setProjectEditImagePreview] = useState('');
@@ -122,7 +122,14 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 	const switchView = async (view) => {
 		setCurrentView(view);
 		if (view === 'generations') {
-			setLocalGenerations(generations.map(g => ({ ...g })));
+			try {
+				const fetchedGens = await getGenerations();
+				setGenerations(fetchedGens);
+				setLocalGenerations(fetchedGens.map(g => ({ ...g })));
+			} catch (e) {
+				console.error("Error fetching generations on view switch:", e);
+				setLocalGenerations(generations.map(g => ({ ...g })));
+			}
 			setNewGenName('');
 			setNewGenValue('');
 		}
@@ -165,6 +172,15 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 	useEffect(() => {
 		if (isAuthorized) {
 			loadDashboardData();
+			getVotingSettings().then(vs => {
+				if (vs) {
+					setAdminVotingSettings({
+						isActive: Boolean(vs.isActive),
+						generation: Number(vs.generation) || 4,
+						startDate: vs.startDate || ''
+					});
+				}
+			}).catch(err => console.error("Error loading voting settings:", err));
 		}
 	}, [isAuthorized, selectedGen]);
 
@@ -457,14 +473,26 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 		setGenSaving(true);
 		try {
 			for (const gen of localGenerations) {
-				await updateGeneration(gen.id, { id: gen.id, name: gen.name, order: gen.order, value: gen.value });
+				const res = await updateGeneration(gen.id, {
+					id: gen.id,
+					name: (gen.name || '').trim(),
+					order: Number(gen.order) || 1,
+					value: Number(gen.value),
+					visible: gen.visible !== false
+				});
+				if (!res.success) {
+					const errMsg = typeof res.error === 'string' ? res.error : (res.error?.message || '저장 중 오류가 발생했습니다.');
+					throw new Error(errMsg);
+				}
 			}
 			const updated = await getGenerations();
 			setGenerations(updated);
-			showToast('기수 정보가 저장되었습니다.', 'success');
+			setLocalGenerations(updated.map(g => ({ ...g })));
+			if (onUpdateGenerations) onUpdateGenerations(updated);
+			showToast('기수 정보가 성공적으로 저장되었습니다.', 'success');
 		} catch (error) {
 			console.error('Save generations error:', error);
-			showToast('기수 정보 저장에 실패했습니다.', 'error');
+			showToast(`기수 정보 저장 실패: ${error.message || error}`, 'error');
 		} finally {
 			setGenSaving(false);
 		}
@@ -481,6 +509,7 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 				const updated = await getGenerations();
 				setGenerations(updated);
 				setLocalGenerations(updated.map(g => ({ ...g })));
+				if (onUpdateGenerations) onUpdateGenerations(updated);
 				showToast('기수가 삭제되었습니다.', 'success');
 			} else {
 				showToast('기수 삭제에 실패했습니다.', 'error');
@@ -631,23 +660,30 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 					setProjectEditTarget(null);
 				}
 			} else {
-				showToast('프로젝트 삭제에 실패했습니다.', 'error');
+				const errorMsg = typeof result.error === 'string' ? result.error : '프로젝트 삭제에 실패했습니다.';
+				showToast(errorMsg, 'error');
 			}
 		} catch (error) {
 			console.error('Delete project error:', error);
-			showToast('프로젝트 삭제 중 오류가 발생했습니다.', 'error');
+			showToast(`프로젝트 삭제 중 오류가 발생했습니다: ${error.message || error}`, 'error');
 		}
 	};
 
 	const handleSaveVotingSettings = async () => {
 		setVotingSaving(true);
 		try {
-			const result = await saveVotingSettings(adminVotingSettings);
+			const payload = {
+				isActive: Boolean(adminVotingSettings.isActive),
+				generation: Number(adminVotingSettings.generation) || 4,
+				startDate: (adminVotingSettings.startDate || '').trim()
+			};
+			const result = await saveVotingSettings(payload);
 			if (result.success) {
-				trackVotingSettingsSave(adminVotingSettings.generation, adminVotingSettings.isActive);
+				trackVotingSettingsSave(payload.generation, payload.isActive);
 				showToast('투표 설정이 저장되었습니다.', 'success');
 			} else {
-				showToast('투표 설정 저장에 실패했습니다.', 'error');
+				const errorMsg = typeof result.error === 'string' ? result.error : '투표 설정 저장에 실패했습니다.';
+				showToast(errorMsg, 'error');
 			}
 		} catch (error) {
 			console.error('Save voting settings error:', error);
@@ -942,6 +978,19 @@ const AdminDashboard = ({ projects, onBackToGallery, showToast }) => {
 							onChange={(e) => setLocalGenerations(prev => prev.map(g => g.id === gen.id ? { ...g, name: e.target.value } : g))}
 							className="flex-1 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
 						/>
+						<button
+							type="button"
+							onClick={() => setLocalGenerations(prev => prev.map(g => g.id === gen.id ? { ...g, visible: g.visible === false ? true : false } : g))}
+							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+								gen.visible !== false
+									? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40 hover:bg-blue-100'
+									: 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-750'
+							}`}
+							title={gen.visible !== false ? "상단 헤더에 노출 중 (클릭하여 숨기기)" : "상단 헤더에서 숨김 (클릭하여 노출하기)"}
+						>
+							{gen.visible !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+							<span>{gen.visible !== false ? '노출' : '숨김'}</span>
+						</button>
 						<div className="flex flex-col gap-0.5">
 							<button
 								onClick={() => handleGenOrderChange(index, -1)}

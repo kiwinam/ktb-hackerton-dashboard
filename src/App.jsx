@@ -138,16 +138,24 @@ function App() {
   const [selectedGeneration, setSelectedGeneration] = useState(4);
   const [generations, setGenerations] = useState([]);
 
-  useEffect(() => {
+  const reloadGenerations = useCallback(() => {
     getGenerations().then(list => {
       setGenerations(list);
       if (list.length > 0) {
-        // Default to the latest generation (last item in order)
-        const sortedList = [...list].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-        setSelectedGeneration(sortedList[sortedList.length - 1].value);
+        const visibleList = list.filter(g => g.visible !== false);
+        const targetList = visibleList.length > 0 ? visibleList : list;
+        const sortedList = [...targetList].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+        setSelectedGeneration(prev => {
+          if (targetList.some(g => Number(g.value) === Number(prev))) return prev;
+          return sortedList[sortedList.length - 1].value;
+        });
       }
     });
   }, []);
+
+  useEffect(() => {
+    reloadGenerations();
+  }, [reloadGenerations]);
 
   useEffect(() => {
     getStudentsByGeneration(selectedGeneration).then(list => {
@@ -289,8 +297,10 @@ function App() {
           }>
             <AdminDashboard
               projects={projects}
+              generations={generations}
               onBackToGallery={() => handleViewChange('gallery')}
               showToast={showToast}
+              onUpdateGenerations={reloadGenerations}
             />
           </Suspense>
         )}

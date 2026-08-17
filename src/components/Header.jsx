@@ -49,7 +49,7 @@ const Header = ({
 					{/* Generation selector: only shown on gallery view */}
 					{currentView === 'gallery' && generations.length > 0 && (
 						<div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-							{generations.map((gen) => (
+							{generations.filter(gen => gen.visible !== false).map((gen) => (
 								<button
 									key={gen.value}
 									onClick={() => onSelectGeneration(gen.value)}

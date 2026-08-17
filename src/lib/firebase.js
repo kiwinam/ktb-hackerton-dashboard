@@ -678,14 +678,17 @@ export const getVotingSettings = async () => {
 export const saveVotingSettings = async (settings) => {
 	try {
 		const docRef = doc(db, "settings", "voting");
-		await setDoc(docRef, {
-			...settings,
+		const cleanSettings = {
+			isActive: Boolean(settings?.isActive),
+			generation: Number(settings?.generation) || 4,
+			startDate: settings?.startDate ? String(settings.startDate).trim() : "",
 			updatedAt: serverTimestamp()
-		}, { merge: true });
+		};
+		await setDoc(docRef, cleanSettings, { merge: true });
 		return { success: true };
 	} catch (error) {
 		console.error("Error saving voting settings:", error);
-		return { success: false, error };
+		return { success: false, error: error.message || error };
 	}
 };
 
@@ -909,10 +912,10 @@ export const getGenerations = async () => {
 		const snap = await getDocs(coll);
 		if (snap.empty) {
 			const defaults = [
-				{ id: "gen_1", value: 1, name: "1기", order: 1 },
-				{ id: "gen_2", value: 2, name: "2기", order: 2 },
-				{ id: "gen_3", value: 3, name: "3기", order: 3 },
-				{ id: "gen_4", value: 4, name: "4기", order: 4 },
+				{ id: "gen_1", value: 1, name: "1기", order: 1, visible: true },
+				{ id: "gen_2", value: 2, name: "2기", order: 2, visible: true },
+				{ id: "gen_3", value: 3, name: "3기", order: 3, visible: true },
+				{ id: "gen_4", value: 4, name: "4기", order: 4, visible: true },
 			];
 			for (const gen of defaults) {
 				await setDoc(doc(db, "generations", gen.id), gen);
@@ -924,16 +927,17 @@ export const getGenerations = async () => {
 			return {
 				id: doc.id,
 				...data,
+				visible: data.visible !== undefined ? Boolean(data.visible) : true,
 				order: data.order !== undefined ? Number(data.order) : 999
 			};
 		}).sort((a, b) => a.order - b.order);
 	} catch (error) {
 		console.error("Error getting generations:", error);
 		return [
-			{ id: "gen_1", value: 1, name: "1기", order: 1 },
-			{ id: "gen_2", value: 2, name: "2기", order: 2 },
-			{ id: "gen_3", value: 3, name: "3기", order: 3 },
-			{ id: "gen_4", value: 4, name: "4기", order: 4 },
+			{ id: "gen_1", value: 1, name: "1기", order: 1, visible: true },
+			{ id: "gen_2", value: 2, name: "2기", order: 2, visible: true },
+			{ id: "gen_3", value: 3, name: "3기", order: 3, visible: true },
+			{ id: "gen_4", value: 4, name: "4기", order: 4, visible: true },
 		];
 	}
 };
@@ -943,11 +947,16 @@ export const getGenerations = async () => {
 export const updateGeneration = async (genId, data) => {
 	try {
 		const genRef = doc(db, "generations", genId);
-		await setDoc(genRef, data, { merge: true });
+		const payload = {
+			...data,
+			id: genId,
+			visible: data.visible !== false
+		};
+		await setDoc(genRef, payload, { merge: true });
 		return { success: true };
 	} catch (error) {
 		console.error("Error updating generation:", error);
-		return { success: false, error };
+		return { success: false, error: error.message || String(error) };
 	}
 };
 
@@ -1025,16 +1034,38 @@ export const updateAdminPassword = async (currentPassword, newPassword) => {
 
 export const adminDeleteProject = async (projectId) => {
 	try {
-		await deleteDoc(doc(db, "projects", projectId));
+		// Delete subcollections (comments, deployments) first
+		try {
+			const commentsSnap = await getDocs(collection(db, COLLECTION_NAME, projectId, "comments"));
+			for (const cDoc of commentsSnap.docs) {
+				await deleteDoc(cDoc.ref);
+			}
+		} catch (e) {
+			console.warn("Could not delete project comments:", e);
+		}
+
+		try {
+			const deploymentsSnap = await getDocs(collection(db, COLLECTION_NAME, projectId, "deployments"));
+			for (const dDoc of deploymentsSnap.docs) {
+				await deleteDoc(dDoc.ref);
+			}
+		} catch (e) {
+			console.warn("Could not delete project deployments:", e);
+		}
+
+		// Delete secret doc if exists
 		try {
 			await deleteDoc(doc(db, PROJECT_SECRETS_COLLECTION, projectId));
 		} catch (e) {
-			// secret 문서가 없어도 무시
+			// Ignore if secret does not exist
 		}
+
+		// Delete main project doc
+		await deleteDoc(doc(db, COLLECTION_NAME, projectId));
 		return { success: true };
 	} catch (error) {
 		console.error("Error deleting project:", error);
-		return { success: false, error };
+		return { success: false, error: error.message || String(error) };
 	}
 };
 
