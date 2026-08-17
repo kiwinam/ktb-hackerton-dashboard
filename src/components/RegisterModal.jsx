@@ -106,10 +106,16 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 	}, [isOpen, formData.generation]);
 
 	const handleChange = (e) => {
-		setFormData({
-			...formData,
-			[e.target.name]: e.target.value
-		});
+		const { name, value } = e.target;
+		if (name === 'password') {
+			const numericVal = value.replace(/[^0-9]/g, '');
+			setFormData(prev => ({ ...prev, password: numericVal }));
+			return;
+		}
+		setFormData(prev => ({
+			...prev,
+			[name]: value
+		}));
 	};
 
 	const handleTagKeyDown = (e) => {
@@ -188,6 +194,12 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+
+		if (!initialData && (!formData.password || !/^\d{4,6}$/.test(formData.password))) {
+			alert('비밀번호는 숫자 4~6자리로 입력해야 합니다.');
+			return;
+		}
+
 		setLoading(true);
 
 		const submissionData = {
@@ -316,8 +328,10 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 											<input
 												type="password"
 												name="password"
-												required
+												required={!initialData}
 												maxLength={6}
+												inputMode="numeric"
+												pattern="[0-9]*"
 												disabled={!!initialData}
 												value={formData.password}
 												onChange={handleChange}

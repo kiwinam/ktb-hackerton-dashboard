@@ -230,19 +230,15 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 					if (logToEdit) {
 						setEditVersion(logToEdit.version || '');
 						setEditLogContent(logToEdit.content || '');
-						// Force re-render of that item in edit mode (we use editingDeploymentId for UI control)
 					}
 				} else {
 					// delete_deployment
 					setIsPasswordModalOpen(false);
-					// Open confirm modal? or just delete?
-					// Let's use Confirm Modal effectively
-					// But confirm modal currently is hardcoded for comments in some generic way?
-					// Let's update ConfirmModal props to be dynamic.
 					setIsConfirmModalOpen(true);
 				}
 				return true;
 			} else {
+				if (showToast) showToast(result?.error || "비밀번호가 일치하지 않습니다.", 'error');
 				return result;
 			}
 		}

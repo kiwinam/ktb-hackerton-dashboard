@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock } from 'lucide-react';
 
@@ -6,8 +6,19 @@ const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState(null);
 
+	useEffect(() => {
+		if (!isOpen) {
+			setPassword('');
+			setError(null);
+		}
+	}, [isOpen]);
+
 	const handleSubmit = async (e) => {
 		e.preventDefault();
+		if (!password || password.length < 4) {
+			setError("비밀번호는 숫자 4~6자리로 입력해주세요.");
+			return;
+		}
 		const result = await onVerify(password);
 		if (result === true || result?.success) {
 			setPassword('');
@@ -15,9 +26,8 @@ const PasswordModal = ({ isOpen, onClose, onVerify, title = "비밀번호 확인
 			onClose();
 		} else {
 			// result is either false or an object with error message
-			const msg = result?.error || "비밀번호가 일치하지 않습니다.";
+			const msg = typeof result?.error === 'string' ? result.error : "비밀번호가 일치하지 않습니다.";
 			setError(msg);
-			// Shake animation trigger could go here
 		}
 	};
 
