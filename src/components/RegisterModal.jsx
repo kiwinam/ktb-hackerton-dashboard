@@ -299,7 +299,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 												onChange={handleChange}
 												className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-bold cursor-pointer h-[42px]"
 											>
-												{generations.map((gen) => (
+												{generations.filter(gen => gen.visible !== false).map((gen) => (
 													<option key={gen.value} value={gen.value}>
 														{gen.name}
 													</option>
