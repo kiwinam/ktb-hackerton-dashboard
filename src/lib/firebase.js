@@ -912,10 +912,10 @@ export const getGenerations = async () => {
 		const snap = await getDocs(coll);
 		if (snap.empty) {
 			const defaults = [
-				{ id: "gen_1", value: 1, name: "1기", order: 1, visible: true },
-				{ id: "gen_2", value: 2, name: "2기", order: 2, visible: true },
-				{ id: "gen_3", value: 3, name: "3기", order: 3, visible: true },
-				{ id: "gen_4", value: 4, name: "4기", order: 4, visible: true },
+				{ id: "gen_1", value: 1, name: "1기", order: 1, visible: true, isDefault: false },
+				{ id: "gen_2", value: 2, name: "2기", order: 2, visible: true, isDefault: false },
+				{ id: "gen_3", value: 3, name: "3기", order: 3, visible: true, isDefault: false },
+				{ id: "gen_4", value: 4, name: "4기", order: 4, visible: true, isDefault: true },
 			];
 			for (const gen of defaults) {
 				await setDoc(doc(db, "generations", gen.id), gen);
@@ -928,16 +928,17 @@ export const getGenerations = async () => {
 				id: doc.id,
 				...data,
 				visible: data.visible !== undefined ? Boolean(data.visible) : true,
+				isDefault: data.isDefault === true,
 				order: data.order !== undefined ? Number(data.order) : 999
 			};
 		}).sort((a, b) => a.order - b.order);
 	} catch (error) {
 		console.error("Error getting generations:", error);
 		return [
-			{ id: "gen_1", value: 1, name: "1기", order: 1, visible: true },
-			{ id: "gen_2", value: 2, name: "2기", order: 2, visible: true },
-			{ id: "gen_3", value: 3, name: "3기", order: 3, visible: true },
-			{ id: "gen_4", value: 4, name: "4기", order: 4, visible: true },
+			{ id: "gen_1", value: 1, name: "1기", order: 1, visible: true, isDefault: false },
+			{ id: "gen_2", value: 2, name: "2기", order: 2, visible: true, isDefault: false },
+			{ id: "gen_3", value: 3, name: "3기", order: 3, visible: true, isDefault: false },
+			{ id: "gen_4", value: 4, name: "4기", order: 4, visible: true, isDefault: true },
 		];
 	}
 };

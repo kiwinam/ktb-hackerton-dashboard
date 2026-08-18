@@ -460,7 +460,9 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			id: `gen_${valueNum}`,
 			value: valueNum,
 			name: newGenName.trim(),
-			order: nextOrder
+			order: nextOrder,
+			visible: true,
+			isDefault: false
 		};
 
 		setLocalGenerations(prev => [...prev, newGenItem]);
@@ -472,13 +474,23 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 	const handleSaveGenerations = async () => {
 		setGenSaving(true);
 		try {
-			for (const gen of localGenerations) {
+			const defaultGenerationId = localGenerations.find(
+				(gen) => gen.visible !== false && gen.isDefault === true
+			)?.id;
+			const generationsToSave = localGenerations.map((gen) => ({
+				...gen,
+				// 숨김 기수는 기본 화면으로 저장되지 않도록 보장합니다.
+				isDefault: gen.id === defaultGenerationId
+			}));
+
+			for (const gen of generationsToSave) {
 				const res = await updateGeneration(gen.id, {
 					id: gen.id,
 					name: (gen.name || '').trim(),
 					order: Number(gen.order) || 1,
 					value: Number(gen.value),
-					visible: gen.visible !== false
+					visible: gen.visible !== false,
+					isDefault: gen.isDefault === true
 				});
 				if (!res.success) {
 					const errMsg = typeof res.error === 'string' ? res.error : (res.error?.message || '저장 중 오류가 발생했습니다.');
@@ -966,7 +978,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 					<Calendar className="w-4 h-4 text-blue-500" />
 					<span>갤러리 기수 수정</span>
 				</h3>
-				<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">기수 이름 및 표시 순서를 변경할 수 있습니다. 변경 후 반드시 저장 버튼을 눌러주세요.</p>
+				<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">기수 이름과 표시 순서를 변경하고, 노출 중인 기수 중 갤러리 기본 화면을 지정할 수 있습니다. 변경 후 반드시 저장 버튼을 눌러주세요.</p>
 			</div>
 			<div className="space-y-3 pt-2">
 				{localGenerations.map((gen, index) => (
@@ -980,7 +992,15 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 						/>
 						<button
 							type="button"
-							onClick={() => setLocalGenerations(prev => prev.map(g => g.id === gen.id ? { ...g, visible: g.visible === false ? true : false } : g))}
+							onClick={() => setLocalGenerations(prev => prev.map(g => {
+								if (g.id !== gen.id) return g;
+								const nextVisible = g.visible === false;
+								return {
+									...g,
+									visible: nextVisible,
+									isDefault: nextVisible ? g.isDefault : false
+								};
+							}))}
 							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
 								gen.visible !== false
 									? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40 hover:bg-blue-100'
@@ -990,6 +1010,21 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 						>
 							{gen.visible !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
 							<span>{gen.visible !== false ? '노출' : '숨김'}</span>
+						</button>
+						<button
+							type="button"
+							disabled={gen.visible === false}
+							onClick={() => setLocalGenerations(prev => prev.map(g =>
+								({ ...g, isDefault: g.id === gen.id })
+							))}
+							className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+								gen.isDefault
+									? 'bg-yellow-50 text-yellow-600 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-700'
+									: 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 hover:bg-yellow-50 hover:text-yellow-500 hover:border-yellow-300'
+							} disabled:opacity-30 disabled:cursor-not-allowed`}
+							title={gen.isDefault ? '갤러리 기본 기수 (설정됨)' : '이 기수를 갤러리 기본값으로 설정'}
+						>
+							<span>{gen.isDefault ? '★ 기본값' : '☆ 기본값'}</span>
 						</button>
 						<div className="flex flex-col gap-0.5">
 							<button

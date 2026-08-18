@@ -17,6 +17,16 @@ const EntryGate = React.lazy(() => import('./components/EntryGate'));
 const VotingView = React.lazy(() => import('./components/VotingView'));
 const AdminDashboard = React.lazy(() => import('./components/AdminDashboard'));
 
+const getGalleryDefaultGeneration = (list) => {
+  const visibleGenerations = list
+    .filter((generation) => generation.visible !== false)
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  const defaultGeneration = visibleGenerations.find((generation) => generation.isDefault === true);
+
+  // 기존 데이터에 기본 기수 설정이 없을 때에는 이전 동작과 동일하게 마지막 노출 기수를 사용합니다.
+  return defaultGeneration?.value ?? visibleGenerations.at(-1)?.value ?? list.at(-1)?.value;
+};
+
 function App() {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -136,19 +146,16 @@ function App() {
 
   // Generation State
   const [selectedGeneration, setSelectedGeneration] = useState(4);
+  const [defaultGeneration, setDefaultGeneration] = useState(4);
   const [generations, setGenerations] = useState([]);
 
   const reloadGenerations = useCallback(() => {
     getGenerations().then(list => {
       setGenerations(list);
-      if (list.length > 0) {
-        const visibleList = list.filter(g => g.visible !== false);
-        const targetList = visibleList.length > 0 ? visibleList : list;
-        const sortedList = [...targetList].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-        setSelectedGeneration(prev => {
-          if (targetList.some(g => Number(g.value) === Number(prev))) return prev;
-          return sortedList[sortedList.length - 1].value;
-        });
+      const nextDefaultGeneration = getGalleryDefaultGeneration(list);
+      if (nextDefaultGeneration !== undefined) {
+        setDefaultGeneration(nextDefaultGeneration);
+        setSelectedGeneration(nextDefaultGeneration);
       }
     });
   }, []);
@@ -177,15 +184,9 @@ function App() {
   const handleViewChange = useCallback((newView) => {
     setView(newView);
     if (newView === 'gallery') {
-      getGenerations().then(list => {
-        setGenerations(list);
-        if (list.length > 0) {
-          const sortedList = [...list].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-          setSelectedGeneration(sortedList[sortedList.length - 1].value);
-        }
-      });
+      reloadGenerations();
     }
-  }, []);
+  }, [reloadGenerations]);
 
   const sortedProjects = React.useMemo(() => {
     return [...projects]
@@ -321,7 +322,7 @@ function App() {
           onClose={handleCloseModal}
           initialData={editingProject}
           onSuccess={(msg) => showToast(msg)}
-          defaultGeneration={selectedGeneration}
+          defaultGeneration={defaultGeneration}
           generations={generations}
           projects={projects}
         />
