@@ -383,7 +383,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 						exit={{ opacity: 0, scale: 0.95, y: 20 }}
 						className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
 					>
-						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-4xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh] overflow-hidden">
+						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-5xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh] overflow-hidden">
 							{/* Header */}
 							<div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800 z-10">
 								<h2 className="text-xl font-bold text-gray-900 dark:text-white truncate pr-4">

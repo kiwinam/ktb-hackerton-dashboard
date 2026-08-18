@@ -273,7 +273,7 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 						exit={{ opacity: 0, scale: 0.95, y: 20 }}
 						className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
 					>
-						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg shadow-xl pointer-events-auto flex flex-col max-h-[90vh]">
+						<div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-3xl shadow-xl pointer-events-auto flex flex-col max-h-[90vh]">
 							<div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 flex-shrink-0">
 								<h2 className="text-xl font-bold text-gray-900 dark:text-white">
 									{initialData ? '프로젝트 수정' : '새 프로젝트 등록'}
