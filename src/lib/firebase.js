@@ -664,6 +664,8 @@ export const getVotingSettings = async () => {
 			const defaultSettings = {
 				isActive: true,
 				generation: 4,
+				// 기수별 참여 팀을 지정하지 않으면 해당 기수의 전체 팀이 투표에 참여합니다.
+				eligibleProjectIdsByGeneration: {},
 				createdAt: serverTimestamp()
 			};
 			await setDoc(docRef, defaultSettings);
@@ -671,19 +673,30 @@ export const getVotingSettings = async () => {
 		}
 	} catch (error) {
 		console.error("Error getting voting settings:", error);
-		return { isActive: false, generation: 4 };
+		return { isActive: false, generation: 4, eligibleProjectIdsByGeneration: {} };
 	}
 };
 
 export const saveVotingSettings = async (settings) => {
 	try {
 		const docRef = doc(db, "settings", "voting");
+		const hasEligibleProjectSettings = Object.prototype.hasOwnProperty.call(settings || {}, "eligibleProjectIdsByGeneration");
+		const eligibleProjectIdsByGeneration = Object.entries(settings?.eligibleProjectIdsByGeneration || {}).reduce((result, [generation, projectIds]) => {
+			const generationNumber = Number(generation);
+			if (Number.isInteger(generationNumber) && generationNumber > 0 && Array.isArray(projectIds)) {
+				result[String(generationNumber)] = [...new Set(projectIds.filter((projectId) => typeof projectId === 'string' && projectId))];
+			}
+			return result;
+		}, {});
 		const cleanSettings = {
 			isActive: Boolean(settings?.isActive),
 			generation: Number(settings?.generation) || 4,
 			startDate: settings?.startDate ? String(settings.startDate).trim() : "",
 			updatedAt: serverTimestamp()
 		};
+		if (hasEligibleProjectSettings) {
+			cleanSettings.eligibleProjectIdsByGeneration = eligibleProjectIdsByGeneration;
+		}
 		await setDoc(docRef, cleanSettings, { merge: true });
 		return { success: true };
 	} catch (error) {

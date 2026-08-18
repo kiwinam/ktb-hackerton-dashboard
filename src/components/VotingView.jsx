@@ -24,6 +24,14 @@ const K_FACTOR = 32;
 const INITIAL_ELO = 1200;
 const MAX_VOTES_PER_USER = 40;
 
+const getEligibleProjectIds = (settings, generation) => {
+	const byGeneration = settings?.eligibleProjectIdsByGeneration;
+	if (!byGeneration || typeof byGeneration !== 'object' || Array.isArray(byGeneration)) return null;
+
+	const projectIds = byGeneration[String(Number(generation))];
+	return Array.isArray(projectIds) ? new Set(projectIds) : null;
+};
+
 const preprocessMarkdown = (text) => {
 	if (!text) return '';
 
@@ -207,7 +215,10 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 
 	// --- ELO Ranking Board Calculation ---
 	const eloRankings = useMemo(() => {
-		const genProjects = projects.filter(p => (p.generation || 3) === rankingGen);
+		const eligibleProjectIds = getEligibleProjectIds(settings, rankingGen);
+		const genProjects = projects.filter(p =>
+			(p.generation || 3) === rankingGen && (!eligibleProjectIds || eligibleProjectIds.has(p.id))
+		);
 		return genProjects.map(p => ({
 			...p,
 			elo: p.elo || 1200,
@@ -215,16 +226,25 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 			losses: p.losses || 0,
 			totalMatches: p.totalMatches || 0
 		})).sort((a, b) => b.elo - a.elo);
-	}, [projects, rankingGen]);
+	}, [projects, rankingGen, settings]);
 
 	// --- Matchup Pairing Logic ---
 	const activeGenProjects = useMemo(() => {
-		let list = projects.filter(p => (p.generation || 3) === settings.generation);
+		const eligibleProjectIds = getEligibleProjectIds(settings, settings.generation);
+		let list = projects.filter(p =>
+			(p.generation || 3) === settings.generation && (!eligibleProjectIds || eligibleProjectIds.has(p.id))
+		);
 		if (voter && !voter.isAdmin) {
 			list = list.filter(p => !(p.members || []).includes(voter.email) && !(p.members || []).includes(voter.name));
 		}
 		return list;
-	}, [projects, settings.generation, voter]);
+	}, [projects, settings, voter]);
+
+	useEffect(() => {
+		if (currentPair && !currentPair.every((project) => activeGenProjects.some((activeProject) => activeProject.id === project.id))) {
+			setCurrentPair(null);
+		}
+	}, [activeGenProjects, currentPair]);
 
 	const allPairs = useMemo(() => {
 		const pairs = [];
@@ -299,6 +319,12 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 	const handleVote = async (winnerId) => {
 		if (!voter || !currentPair) return;
 		const [projA, projB] = currentPair;
+		const activeProjectIds = new Set(activeGenProjects.map((project) => project.id));
+		if (!activeProjectIds.has(projA.id) || !activeProjectIds.has(projB.id)) {
+			setCurrentPair(null);
+			showToast("투표 대상 팀이 변경되었습니다. 다음 매치를 확인해주세요.", 'info');
+			return;
+		}
 
 		const winnerProj = projA.id === winnerId ? projA : projB;
 		const loserProj = projA.id === winnerId ? projB : projA;

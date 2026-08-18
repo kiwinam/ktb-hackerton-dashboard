@@ -32,6 +32,11 @@ import {
 	db
 } from '../lib/firebase';
 
+const getEligibleProjectIdsByGeneration = (settings) => {
+	const value = settings?.eligibleProjectIdsByGeneration;
+	return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+};
+
 const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToGallery, showToast, onUpdateGenerations }) => {
 	// Project Edit Image Upload & Course Tab State
 	const [projectEditImageFile, setProjectEditImageFile] = useState(null);
@@ -113,7 +118,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 	}, [projects, selectedGen, projectEditTarget]);
 
 	// 4. 투표 관리
-	const [adminVotingSettings, setAdminVotingSettings] = useState({ isActive: false, generation: 4, startDate: '' });
+	const [adminVotingSettings, setAdminVotingSettings] = useState({ isActive: false, generation: 4, startDate: '', eligibleProjectIdsByGeneration: {} });
 	const [votingSaving, setVotingSaving] = useState(false);
 
 	// --- 통합 뷰 상태 관리 ---
@@ -138,7 +143,8 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			setAdminVotingSettings({
 				isActive: vs.isActive || false,
 				generation: vs.generation || (generations[generations.length - 1]?.value || 4),
-				startDate: vs.startDate || ''
+				startDate: vs.startDate || '',
+				eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(vs)
 			});
 		}
 		if (view === 'projects') {
@@ -177,7 +183,8 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 					setAdminVotingSettings({
 						isActive: Boolean(vs.isActive),
 						generation: Number(vs.generation) || 4,
-						startDate: vs.startDate || ''
+						startDate: vs.startDate || '',
+						eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(vs)
 					});
 				}
 			}).catch(err => console.error("Error loading voting settings:", err));
@@ -687,7 +694,8 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			const payload = {
 				isActive: Boolean(adminVotingSettings.isActive),
 				generation: Number(adminVotingSettings.generation) || 4,
-				startDate: (adminVotingSettings.startDate || '').trim()
+				startDate: (adminVotingSettings.startDate || '').trim(),
+				eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(adminVotingSettings)
 			};
 			const result = await saveVotingSettings(payload);
 			if (result.success) {
@@ -703,6 +711,38 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 		} finally {
 			setVotingSaving(false);
 		}
+	};
+
+	const votingTargetGeneration = Number(adminVotingSettings.generation) || 4;
+	const votingTargetProjects = useMemo(() => {
+		return projects
+			.filter((project) => (project.generation || 3) === votingTargetGeneration)
+			.sort((a, b) => (a.team || a.title || '').localeCompare(b.team || b.title || '', 'ko'));
+	}, [projects, votingTargetGeneration]);
+	const configuredVotingProjectIds = getEligibleProjectIdsByGeneration(adminVotingSettings)[String(votingTargetGeneration)];
+	const isVotingTeamSelectionConfigured = Array.isArray(configuredVotingProjectIds);
+	const selectedVotingProjectIds = new Set(
+		isVotingTeamSelectionConfigured ? configuredVotingProjectIds : votingTargetProjects.map((project) => project.id)
+	);
+
+	const updateVotingTargetProjectIds = (projectIds) => {
+		setAdminVotingSettings((settings) => ({
+			...settings,
+			eligibleProjectIdsByGeneration: {
+				...getEligibleProjectIdsByGeneration(settings),
+				[String(votingTargetGeneration)]: [...new Set(projectIds)]
+			}
+		}));
+	};
+
+	const handleToggleVotingTargetProject = (projectId) => {
+		const currentIds = isVotingTeamSelectionConfigured
+			? configuredVotingProjectIds
+			: votingTargetProjects.map((project) => project.id);
+		const nextIds = currentIds.includes(projectId)
+			? currentIds.filter((id) => id !== projectId)
+			: [...currentIds, projectId];
+		updateVotingTargetProjectIds(nextIds);
 	};
 
 	const handleSyncData = async () => {
@@ -1613,6 +1653,62 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 							<ChevronDown className="w-4 h-4" />
 						</div>
 					</div>
+				</div>
+				<div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-750 space-y-3">
+					<div className="flex items-start justify-between gap-3">
+						<div>
+							<p className="text-xs font-bold text-gray-900 dark:text-white">ELO 참여 팀 선별</p>
+							<p className="text-xs text-gray-400 mt-0.5">선택한 팀만 매치업과 ELO 랭킹에 포함됩니다. 설정하지 않은 기수는 전체 팀이 참여합니다.</p>
+						</div>
+						<span className="shrink-0 px-2 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-[11px] font-bold">
+							{selectedVotingProjectIds.size}팀 선택
+						</span>
+					</div>
+					{votingTargetProjects.length === 0 ? (
+						<p className="py-3 text-center text-xs text-gray-400">{votingTargetGeneration}기에 등록된 프로젝트가 없습니다.</p>
+					) : (
+						<>
+							<div className="flex gap-2">
+								<button
+									type="button"
+									onClick={() => updateVotingTargetProjectIds(votingTargetProjects.map((project) => project.id))}
+									className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[11px] font-bold text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition-colors"
+								>
+									전체 선택
+								</button>
+								<button
+									type="button"
+									onClick={() => updateVotingTargetProjectIds([])}
+									className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[11px] font-bold text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 transition-colors"
+								>
+									선택 해제
+								</button>
+							</div>
+							<div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+								{votingTargetProjects.map((project) => {
+									const isSelected = selectedVotingProjectIds.has(project.id);
+									return (
+										<label key={project.id} className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+											isSelected
+												? 'bg-white dark:bg-gray-800 border-green-200 dark:border-green-800/60'
+												: 'border-transparent hover:bg-white/70 dark:hover:bg-gray-800/70'
+										}`}>
+											<input
+												type="checkbox"
+												checked={isSelected}
+												onChange={() => handleToggleVotingTargetProject(project.id)}
+												className="w-4 h-4 rounded border-gray-300 text-green-500 focus:ring-green-400"
+											/>
+											<div className="min-w-0">
+												<p className="text-xs font-bold text-gray-800 dark:text-gray-100 truncate">{project.team || '팀명 없음'} · {project.title}</p>
+												<p className="text-[11px] text-gray-400 truncate">{project.members?.join(', ') || '구성원 정보 없음'}</p>
+											</div>
+										</label>
+									);
+								})}
+							</div>
+						</>
+					)}
 				</div>
 				<div>
 					<label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">투표 시작 예약 일정 <span className="text-gray-400 font-normal">(선택사항)</span></label>
