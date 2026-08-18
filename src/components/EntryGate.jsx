@@ -38,7 +38,7 @@ const EntryGate = ({ onLogin }) => {
 						<Lock className="w-8 h-8" />
 					</div>
 					<h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-						KTB 프로젝트 갤러리
+						KTB 갤러리
 					</h1>
 					<p className="text-gray-500 dark:text-gray-400">
 						내부 구경을 위해 입장 코드를 입력해주세요.

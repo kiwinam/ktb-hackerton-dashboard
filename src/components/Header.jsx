@@ -1,11 +1,11 @@
 import React from 'react';
 import { Plus, Moon, Sun, Vote, LayoutGrid } from 'lucide-react';
 
-const Header = ({ 
-	onRegister, 
-	theme, 
-	toggleTheme, 
-	selectedGeneration, 
+const Header = ({
+	onRegister,
+	theme,
+	toggleTheme,
+	selectedGeneration,
 	onSelectGeneration,
 	currentView = 'gallery',
 	onViewChange,
@@ -15,13 +15,13 @@ const Header = ({
 		<header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 transition-colors duration-200">
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
 				<div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
-					<h1 
+					<h1
 						onClick={() => onViewChange('gallery')}
 						className="text-xl font-black text-kakao-black dark:text-white tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
 					>
-						KTB 프로젝트 갤러리
+						KTB 갤러리
 					</h1>
-					
+
 					{/* Navigation tabs */}
 					<div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 text-xs sm:text-sm font-bold">
 						<button
