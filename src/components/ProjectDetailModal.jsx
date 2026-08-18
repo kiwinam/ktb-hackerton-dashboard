@@ -33,6 +33,7 @@ const preprocessMarkdown = (text) => {
 };
 
 const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showToast }) => {
+	const serviceUrl = project?.url?.trim();
 	const [comments, setComments] = useState([]);
 	const [newComment, setNewComment] = useState('');
 	const [authorName, setAuthorName] = useState('');
@@ -449,15 +450,26 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 										</div>
 
 										<div className="mt-6">
-											<a 
-												href={project.url} 
-												target="_blank" 
-												rel="noopener noreferrer" 
-												onClick={() => trackProjectLinkClick(project.id, project.title, project.url)}
-												className="block w-full bg-kakao-yellow text-kakao-black text-center py-3 rounded-xl font-bold hover:bg-yellow-400 transition-colors"
-											>
-												서비스 보러가기
-											</a>
+											{serviceUrl ? (
+												<a
+													href={serviceUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													onClick={() => trackProjectLinkClick(project.id, project.title, serviceUrl)}
+													className="block w-full bg-kakao-yellow text-kakao-black text-center py-3 rounded-xl font-bold hover:bg-yellow-400 transition-colors"
+												>
+													서비스 보러가기
+												</a>
+											) : (
+												<button
+													type="button"
+													disabled
+													title="서비스 URL이 아직 등록되지 않았습니다."
+													className="block w-full bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 text-center py-3 rounded-xl font-bold cursor-not-allowed"
+												>
+													서비스 보러가기
+												</button>
+											)}
 										</div>
 									</div>
 

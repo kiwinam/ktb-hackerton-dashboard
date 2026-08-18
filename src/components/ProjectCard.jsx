@@ -10,6 +10,7 @@ const ProjectCard = ({ project, onEdit, onClick, students = [] }) => {
 	// const [commentCount, setCommentCount] = useState(0); // Removing local state
 	const sessionId = localStorage.getItem('hackathon_session_id');
 	const isLiked = project.likedBy?.includes(sessionId);
+	const serviceUrl = project.url?.trim();
 
 	// Removed individual subscription to comments to prevent N+1 listener issues
 	// React.useEffect(() => { ... }, [project.id]);
@@ -199,19 +200,21 @@ const ProjectCard = ({ project, onEdit, onClick, students = [] }) => {
 						</div>
 					</div>
 
-					<a
-						href={project.url}
-						target="_blank"
-						rel="noopener noreferrer"
-						onClick={(e) => {
-							e.stopPropagation();
-							trackProjectLinkClick(project.id, project.title, project.url);
-						}}
-						className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-gray-50 dark:bg-gray-700 hover:bg-kakao-yellow dark:hover:bg-kakao-yellow hover:text-kakao-black dark:text-gray-300 dark:hover:text-kakao-black text-gray-700 rounded-lg text-sm font-bold transition-colors"
-					>
-						<span>보러가기</span>
-						<ExternalLink className="w-4 h-4" />
-					</a>
+					{serviceUrl && (
+						<a
+							href={serviceUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							onClick={(e) => {
+								e.stopPropagation();
+								trackProjectLinkClick(project.id, project.title, serviceUrl);
+							}}
+							className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-gray-50 dark:bg-gray-700 hover:bg-kakao-yellow dark:hover:bg-kakao-yellow hover:text-kakao-black dark:text-gray-300 dark:hover:text-kakao-black text-gray-700 rounded-lg text-sm font-bold transition-colors"
+						>
+							<span>보러가기</span>
+							<ExternalLink className="w-4 h-4" />
+						</a>
+					)}
 				</div>
 			</div>
 		</motion.div>

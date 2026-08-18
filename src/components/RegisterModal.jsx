@@ -538,17 +538,16 @@ const RegisterModal = ({ isOpen, onClose, initialData = null, onSuccess, default
 
 									<div>
 										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-											서비스 URL *
+											서비스 URL <span className="text-gray-400 font-normal">(선택)</span>
 										</label>
 										<div className="flex space-x-2">
 											<input
 												type="url"
 												name="url"
-												required
 												value={formData.url}
 												onChange={handleChange}
 												className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-kakao-yellow focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-												placeholder="https://example.com"
+												placeholder="https://example.com (서비스 준비 후 등록 가능)"
 											/>
 											<button
 												type="button"
