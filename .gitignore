@@ -27,3 +27,5 @@ dist-ssr
 /data/*.xlsx
 /data/*.numbers
 /data/*.csv
+
+.firebase/
