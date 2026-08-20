@@ -1,0 +1,41 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "generation", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dev_students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "generation", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "generation", "order": "ASCENDING" },
+        { "fieldPath": "course", "order": "ASCENDING" },
+        { "fieldPath": "kor_name", "order": "ASCENDING" },
+        { "fieldPath": "birthdate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dev_students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "generation", "order": "ASCENDING" },
+        { "fieldPath": "course", "order": "ASCENDING" },
+        { "fieldPath": "kor_name", "order": "ASCENDING" },
+        { "fieldPath": "birthdate", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

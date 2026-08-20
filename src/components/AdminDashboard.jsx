@@ -4,13 +4,34 @@ import {
 	Calendar, ChevronRight, RefreshCw, Shield, Lock,
 	Eye, EyeOff, Play, FileText, Check, AlertCircle, Download,
 	Settings, Edit2, Trash2, Save, X, KeyRound, ChevronUp, ChevronDown,
-	Vote, ToggleLeft, ToggleRight, Plus, Upload
+	Vote, ToggleLeft, ToggleRight, Plus, Upload, UserPlus, UserCog
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
+import VotingVideoManager from './VotingVideoManager';
 import { trackProjectEdit, trackProjectDelete, trackVotingSettingsSave, trackAdminAuth, trackAdminLogout } from '../lib/analytics';
+import { getBrowserStorageKey } from '../lib/environment';
+import {
+	formatDateTimeLocalInSeoul,
+	formatVotingStartAt,
+	hasSavedVotingTargets,
+	parseSeoulDateTimeInput,
+	requiresExplicitVotingTargets
+} from '../lib/votingSettings';
+import {
+	calculateOptimalMatchPolicy,
+	getInitialEloForGeneration,
+	getKFactorForGeneration,
+	getMatchPoliciesByGeneration,
+	getMatchPolicyForGeneration,
+	getPairCount
+} from '../lib/votingMatchPolicy';
 
 import {
 	getStudentsByGeneration,
+	getStudentsPage,
+	createStudent,
+	updateStudent,
+	deleteStudent,
 	getMatchupsByGeneration,
 	syncVotingData,
 	getVoterVotes,
@@ -29,13 +50,62 @@ import {
 	updateProject,
 	uploadThumbnailFromFile,
 	uploadThumbnailFromUrl,
-	db
+	uploadVotingVideo,
+	deleteVotingVideo
 } from '../lib/firebase';
+import { STUDENT_COURSES, isStudentActive } from '../lib/studentManagement';
 
 const getEligibleProjectIdsByGeneration = (settings) => {
 	const value = settings?.eligibleProjectIdsByGeneration;
 	return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 };
+
+const toAdminVotingSettings = (settings, fallbackGeneration = 4) => ({
+	isActive: Boolean(settings?.isActive),
+	generation: Number(settings?.generation) || fallbackGeneration,
+	startAt: settings?.startAt || null,
+	startDate: formatDateTimeLocalInSeoul(settings?.startAt) || '',
+	legacyStartDate: settings?.startAt ? '' : (settings?.startDate || ''),
+	eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(settings),
+	matchPolicyByGeneration: getMatchPoliciesByGeneration(settings)
+});
+
+const MAX_VOTING_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_VOTING_VIDEO_DURATION_SECONDS = 300;
+const ADMIN_AUTH_KEY = getBrowserStorageKey('ktb_admin_auth');
+const STUDENT_PAGE_SIZE = 20;
+
+const createStudentForm = (generation = 4) => ({
+	name: '',
+	kor_name: '',
+	course: STUDENT_COURSES[0],
+	birthdate: '',
+	generation,
+	status: 'active'
+});
+
+const getVideoDuration = (file) => new Promise((resolve, reject) => {
+	const video = document.createElement('video');
+	const objectUrl = URL.createObjectURL(file);
+	const cleanup = () => {
+		URL.revokeObjectURL(objectUrl);
+		video.removeAttribute('src');
+		video.load();
+	};
+	video.preload = 'metadata';
+	video.onloadedmetadata = () => {
+		const duration = video.duration;
+		cleanup();
+		Number.isFinite(duration) && duration > 0
+			? resolve(duration)
+			: reject(new Error('영상 길이를 확인할 수 없습니다.'));
+	};
+	video.onerror = () => {
+		cleanup();
+		reject(new Error('영상 파일을 읽을 수 없습니다.'));
+	};
+	video.src = objectUrl;
+});
 
 const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToGallery, showToast, onUpdateGenerations }) => {
 	// Project Edit Image Upload & Course Tab State
@@ -49,7 +119,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 
 	// Auth State
 	const [isAuthorized, setIsAuthorized] = useState(() => {
-		return sessionStorage.getItem('ktb_admin_auth') === 'true';
+		return sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true';
 	});
 	const [systemPassword, setSystemPassword] = useState('');
 	const [authError, setAuthError] = useState('');
@@ -65,6 +135,19 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 	const [loadingStudentVotes, setLoadingStudentVotes] = useState(false);
 	const [syncLoading, setSyncLoading] = useState(false);
 	const [selectedStudent, setSelectedStudent] = useState(null); // Selected student for detailed votes view
+
+	// Student management state
+	const [studentManagementGeneration, setStudentManagementGeneration] = useState(4);
+	const [studentPage, setStudentPage] = useState([]);
+	const [studentTotal, setStudentTotal] = useState(0);
+	const [studentPageIndex, setStudentPageIndex] = useState(0);
+	const [studentPageCursors, setStudentPageCursors] = useState([null]);
+	const [studentPageLastCursor, setStudentPageLastCursor] = useState(null);
+	const [studentHasNextPage, setStudentHasNextPage] = useState(false);
+	const [studentManagementLoading, setStudentManagementLoading] = useState(false);
+	const [studentSaving, setStudentSaving] = useState(false);
+	const [studentEditTarget, setStudentEditTarget] = useState(null);
+	const [studentForm, setStudentForm] = useState(() => createStudentForm(4));
 
 	// Search and Filter State
 	const [searchTerm, setSearchTerm] = useState('');
@@ -118,8 +201,11 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 	}, [projects, selectedGen, projectEditTarget]);
 
 	// 4. 투표 관리
-	const [adminVotingSettings, setAdminVotingSettings] = useState({ isActive: false, generation: 4, startDate: '', eligibleProjectIdsByGeneration: {} });
+	const [adminVotingSettings, setAdminVotingSettings] = useState({ isActive: false, generation: 4, startAt: null, startDate: '', legacyStartDate: '', eligibleProjectIdsByGeneration: {}, matchPolicyByGeneration: {} });
+	const [savedVotingSettings, setSavedVotingSettings] = useState({ isActive: false, generation: 4, startAt: null, startDate: '', eligibleProjectIdsByGeneration: {}, matchPolicyByGeneration: {} });
 	const [votingSaving, setVotingSaving] = useState(false);
+	const [votingManagementTab, setVotingManagementTab] = useState('settings');
+	const [votingVideoUploadState, setVotingVideoUploadState] = useState({});
 
 	// --- 통합 뷰 상태 관리 ---
 	const [currentView, setCurrentView] = useState('menu'); // 'menu' | 'generations' | 'password' | 'projects' | 'voting' | 'dashboard'
@@ -139,18 +225,24 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			setNewGenValue('');
 		}
 		if (view === 'voting') {
+			setVotingManagementTab('settings');
 			const vs = await getVotingSettings();
-			setAdminVotingSettings({
-				isActive: vs.isActive || false,
-				generation: vs.generation || (generations[generations.length - 1]?.value || 4),
-				startDate: vs.startDate || '',
-				eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(vs)
-			});
+			const settings = toAdminVotingSettings(vs, generations[generations.length - 1]?.value || 4);
+			setAdminVotingSettings(settings);
+			setSavedVotingSettings(settings);
 		}
 		if (view === 'projects') {
 			setProjectEditTarget(null);
 			setProjectEditData({});
 			setProjectEditNewPw('');
+		}
+		if (view === 'students') {
+			const generation = selectedGen || generations.at(-1)?.value || 4;
+			setStudentManagementGeneration(generation);
+			setStudentEditTarget(null);
+			setStudentForm(createStudentForm(generation));
+			setStudentPageCursors([null]);
+			await loadStudentManagementPage(generation, null, 0);
 		}
 		if (view === 'password') {
 			setCurrentPw('');
@@ -180,12 +272,9 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			loadDashboardData();
 			getVotingSettings().then(vs => {
 				if (vs) {
-					setAdminVotingSettings({
-						isActive: Boolean(vs.isActive),
-						generation: Number(vs.generation) || 4,
-						startDate: vs.startDate || '',
-						eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(vs)
-					});
+					const settings = toAdminVotingSettings(vs);
+					setAdminVotingSettings(settings);
+					setSavedVotingSettings(settings);
 				}
 			}).catch(err => console.error("Error loading voting settings:", err));
 		}
@@ -196,7 +285,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 		setSelectedStudent(null);
 		try {
 			const [studentsList, matchupsList] = await Promise.all([
-				getStudentsByGeneration(selectedGen),
+				getStudentsByGeneration(selectedGen, { includeInactive: true }),
 				getMatchupsByGeneration(selectedGen)
 			]);
 			setStudents(studentsList);
@@ -206,6 +295,109 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			showToast("데이터를 불러오는데 실패했습니다.", 'error');
 		} finally {
 			setDataLoading(false);
+		}
+	};
+
+	const loadStudentManagementPage = async (generation, cursor = null, pageIndex = 0) => {
+		setStudentManagementLoading(true);
+		try {
+			const result = await getStudentsPage({ generation, pageSize: STUDENT_PAGE_SIZE, cursor });
+			if (result.error) throw result.error;
+			setStudentPage(result.students);
+			setStudentTotal(result.total);
+			setStudentHasNextPage(result.hasNextPage);
+			setStudentPageLastCursor(result.lastCursor);
+			setStudentPageIndex(pageIndex);
+		} catch (error) {
+			console.error('Failed to load students:', error);
+			setStudentPage([]);
+			setStudentTotal(0);
+			setStudentHasNextPage(false);
+			setStudentPageLastCursor(null);
+			showToast('학생 목록을 불러오는데 실패했습니다.', 'error');
+		} finally {
+			setStudentManagementLoading(false);
+		}
+	};
+
+	const resetStudentManagementPage = async (generation) => {
+		setStudentManagementGeneration(generation);
+		setStudentPageCursors([null]);
+		setStudentPageIndex(0);
+		setStudentEditTarget(null);
+		setStudentForm(createStudentForm(generation));
+		await loadStudentManagementPage(generation, null, 0);
+	};
+
+	const handleStudentPageNext = async () => {
+		if (!studentHasNextPage || !studentPageLastCursor) return;
+		const nextPageIndex = studentPageIndex + 1;
+		const nextCursors = [...studentPageCursors.slice(0, nextPageIndex), studentPageLastCursor];
+		setStudentPageCursors(nextCursors);
+		await loadStudentManagementPage(studentManagementGeneration, studentPageLastCursor, nextPageIndex);
+	};
+
+	const handleStudentPagePrevious = async () => {
+		if (studentPageIndex === 0) return;
+		const previousPageIndex = studentPageIndex - 1;
+		await loadStudentManagementPage(
+			studentManagementGeneration,
+			studentPageCursors[previousPageIndex],
+			previousPageIndex
+		);
+	};
+
+	const selectStudentForEdit = (student) => {
+		setStudentEditTarget(student);
+		setStudentForm({
+			name: student.name || '',
+			kor_name: student.kor_name || '',
+			course: student.course || STUDENT_COURSES[0],
+			birthdate: student.birthdate || '',
+			generation: student.generation || studentManagementGeneration,
+			status: isStudentActive(student) ? 'active' : 'inactive'
+		});
+	};
+
+	const refreshStudentManagementPage = async () => {
+		const cursor = studentPageCursors[studentPageIndex];
+		await loadStudentManagementPage(studentManagementGeneration, cursor, studentPageIndex);
+	};
+
+	const handleSaveStudent = async (event) => {
+		event.preventDefault();
+		setStudentSaving(true);
+		try {
+			const result = studentEditTarget
+				? await updateStudent(studentEditTarget.id, studentForm)
+				: await createStudent(studentForm);
+			if (!result.success) throw new Error(result.error || '학생 정보를 저장하지 못했습니다.');
+			showToast(studentEditTarget ? '학생 정보가 수정되었습니다.' : '학생이 추가되었습니다.', 'success');
+			setStudentEditTarget(null);
+			setStudentForm(createStudentForm(studentManagementGeneration));
+			await resetStudentManagementPage(studentManagementGeneration);
+		} catch (error) {
+			showToast(error.message || '학생 정보 저장에 실패했습니다.', 'error');
+		} finally {
+			setStudentSaving(false);
+		}
+	};
+
+	const handleDeleteStudent = async () => {
+		if (!studentEditTarget) return;
+		if (!window.confirm(`"${studentEditTarget.name}" 학생을 영구 삭제하시겠습니까?\n투표 또는 프로젝트에 연결된 학생은 삭제할 수 없습니다.`)) return;
+		setStudentSaving(true);
+		try {
+			const result = await deleteStudent(studentEditTarget);
+			if (!result.success) throw new Error(result.error || '학생 삭제에 실패했습니다.');
+			showToast('학생이 삭제되었습니다.', 'success');
+			setStudentEditTarget(null);
+			setStudentForm(createStudentForm(studentManagementGeneration));
+			await resetStudentManagementPage(studentManagementGeneration);
+		} catch (error) {
+			showToast(error.message || '학생 삭제에 실패했습니다.', 'error');
+		} finally {
+			setStudentSaving(false);
 		}
 	};
 
@@ -224,7 +416,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			const isValid = await verifyAdminPassword(systemPassword);
 			if (isValid) {
 				setIsAuthorized(true);
-				sessionStorage.setItem('ktb_admin_auth', 'true');
+				sessionStorage.setItem(ADMIN_AUTH_KEY, 'true');
 				trackAdminAuth(true);
 				showToast("관리자 비밀번호 인증 성공!", 'success');
 			} else {
@@ -242,7 +434,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 
 	const handleLogout = () => {
 		setIsAuthorized(false);
-		sessionStorage.removeItem('ktb_admin_auth');
+		sessionStorage.removeItem(ADMIN_AUTH_KEY);
 		setSystemPassword('');
 		trackAdminLogout();
 		showToast("로그아웃 되었습니다.", 'success');
@@ -689,18 +881,87 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 	};
 
 	const handleSaveVotingSettings = async () => {
+		const requiresExplicitTargets = requiresExplicitVotingTargets(votingTargetGeneration);
+		if (requiresExplicitTargets && (!isVotingTeamSelectionConfigured || selectedVotingProjectIds.size < 2)) {
+			showToast('4기부터는 투표 대상 팀을 2개 이상 선택하고 저장해야 합니다.', 'error');
+			return;
+		}
+		const policy = getMatchPolicyForGeneration(adminVotingSettings, votingTargetGeneration);
+		const calculation = calculateOptimalMatchPolicy({
+			voterCount: policy.voterCount,
+			finalistMemberCount: policy.finalistMemberCount,
+			teamCount: selectedVotingProjectIds.size
+		});
+		if (!calculation.isValid) {
+			showToast(calculation.error, 'error');
+			return;
+		}
+
+		const manualMatchesPerVoter = Number(policy.manualMatchesPerVoter);
+		const maxMatchesPerVoter = getPairCount(selectedVotingProjectIds.size);
+		const initialElo = Number(policy.initialElo);
+		const kFactor = Number(policy.kFactor);
+		if (!Number.isInteger(initialElo) || initialElo <= 0 || !Number.isInteger(kFactor) || kFactor <= 0) {
+			showToast('초기 Elo와 K-factor는 1 이상의 정수로 입력해주세요.', 'error');
+			return;
+		}
+		if (
+			policy.mode === 'manual'
+			&& (!Number.isInteger(manualMatchesPerVoter) || manualMatchesPerVoter <= 0 || manualMatchesPerVoter > maxMatchesPerVoter)
+		) {
+			showToast(`수동 판수는 1판에서 ${maxMatchesPerVoter}판 사이로 입력해주세요.`, 'error');
+			return;
+		}
+
+		const resolvedMatchesPerVoter = policy.mode === 'manual'
+			? manualMatchesPerVoter
+			: calculation.matchesPerVoter;
+		const resolvedPolicy = {
+			mode: policy.mode === 'manual' ? 'manual' : 'auto',
+			voterCount: calculation.voterCount,
+			finalistMemberCount: calculation.finalistMemberCount,
+			teamCount: calculation.teamCount,
+			manualMatchesPerVoter,
+			resolvedMatchesPerVoter,
+			initialElo,
+			kFactor,
+			formulaVersion: calculation.formulaVersion,
+			confidenceLevel: calculation.confidenceLevel,
+			marginOfError: calculation.marginOfError,
+			pairCount: calculation.pairCount,
+			sampleSizePerPair: calculation.sampleSizePerPair,
+			targetTotalMatches: calculation.targetTotalMatches,
+			expectedTotalMatches: calculation.expectedTotalMatches
+		};
+
 		setVotingSaving(true);
 		try {
 			const payload = {
 				isActive: Boolean(adminVotingSettings.isActive),
 				generation: Number(adminVotingSettings.generation) || 4,
 				startDate: (adminVotingSettings.startDate || '').trim(),
-				eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(adminVotingSettings)
+				startAt: adminVotingSettings.startAt,
+				eligibleProjectIdsByGeneration: getEligibleProjectIdsByGeneration(adminVotingSettings),
+				matchPolicyByGeneration: {
+					...getMatchPoliciesByGeneration(adminVotingSettings),
+					[String(votingTargetGeneration)]: resolvedPolicy
+				}
 			};
 			const result = await saveVotingSettings(payload);
 			if (result.success) {
+				setAdminVotingSettings((current) => ({
+					...current,
+					legacyStartDate: '',
+					matchPolicyByGeneration: payload.matchPolicyByGeneration
+				}));
+				setSavedVotingSettings((current) => ({
+					...current,
+					...payload,
+					legacyStartDate: '',
+					matchPolicyByGeneration: payload.matchPolicyByGeneration
+				}));
 				trackVotingSettingsSave(payload.generation, payload.isActive);
-				showToast('투표 설정이 저장되었습니다.', 'success');
+				showToast(`투표 설정이 저장되었습니다. 학생 1명당 ${resolvedMatchesPerVoter}판으로 적용됩니다.`, 'success');
 			} else {
 				const errorMsg = typeof result.error === 'string' ? result.error : '투표 설정 저장에 실패했습니다.';
 				showToast(errorMsg, 'error');
@@ -722,8 +983,32 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 	const configuredVotingProjectIds = getEligibleProjectIdsByGeneration(adminVotingSettings)[String(votingTargetGeneration)];
 	const isVotingTeamSelectionConfigured = Array.isArray(configuredVotingProjectIds);
 	const selectedVotingProjectIds = new Set(
-		isVotingTeamSelectionConfigured ? configuredVotingProjectIds : votingTargetProjects.map((project) => project.id)
+		isVotingTeamSelectionConfigured
+			? configuredVotingProjectIds
+			: (requiresExplicitVotingTargets(votingTargetGeneration) ? [] : votingTargetProjects.map((project) => project.id))
 	);
+	const currentMatchPolicy = getMatchPolicyForGeneration(adminVotingSettings, votingTargetGeneration);
+	const currentAutoMatchCalculation = calculateOptimalMatchPolicy({
+		voterCount: currentMatchPolicy.voterCount,
+		finalistMemberCount: currentMatchPolicy.finalistMemberCount,
+		teamCount: selectedVotingProjectIds.size
+	});
+	const previewMatchesPerVoter = currentMatchPolicy.mode === 'manual'
+		? Number(currentMatchPolicy.manualMatchesPerVoter) || 0
+		: (currentAutoMatchCalculation.matchesPerVoter || 0);
+
+	const updateCurrentMatchPolicy = (patch) => {
+		setAdminVotingSettings((settings) => ({
+			...settings,
+			matchPolicyByGeneration: {
+				...getMatchPoliciesByGeneration(settings),
+				[String(votingTargetGeneration)]: {
+					...getMatchPolicyForGeneration(settings, votingTargetGeneration),
+					...patch
+				}
+			}
+		}));
+	};
 
 	const updateVotingTargetProjectIds = (projectIds) => {
 		setAdminVotingSettings((settings) => ({
@@ -738,18 +1023,111 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 	const handleToggleVotingTargetProject = (projectId) => {
 		const currentIds = isVotingTeamSelectionConfigured
 			? configuredVotingProjectIds
-			: votingTargetProjects.map((project) => project.id);
+			: (requiresExplicitVotingTargets(votingTargetGeneration) ? [] : votingTargetProjects.map((project) => project.id));
 		const nextIds = currentIds.includes(projectId)
 			? currentIds.filter((id) => id !== projectId)
 			: [...currentIds, projectId];
 		updateVotingTargetProjectIds(nextIds);
 	};
 
+	const savedVotingTargetGeneration = Number(savedVotingSettings.generation) || 4;
+	const savedVotingTargetProjects = useMemo(() => (
+		projects
+			.filter((project) => (project.generation || 3) === savedVotingTargetGeneration)
+			.sort((a, b) => (a.team || a.title || '').localeCompare(b.team || b.title || '', 'ko'))
+	), [projects, savedVotingTargetGeneration]);
+	const savedVotingProjectIds = getEligibleProjectIdsByGeneration(savedVotingSettings)[String(savedVotingTargetGeneration)];
+	const hasSavedTargetSelection = hasSavedVotingTargets(savedVotingSettings, savedVotingTargetGeneration);
+	const savedVotingVideoProjects = hasSavedTargetSelection
+		? savedVotingTargetProjects.filter((project) => savedVotingProjectIds.includes(project.id))
+		: (requiresExplicitVotingTargets(savedVotingTargetGeneration) ? [] : savedVotingTargetProjects);
+	const missingSavedVotingProjectCount = hasSavedTargetSelection
+		? savedVotingProjectIds.filter((projectId) => !savedVotingTargetProjects.some((project) => project.id === projectId)).length
+		: 0;
+	const normalizeProjectIds = (projectIds) => (Array.isArray(projectIds) ? [...projectIds].sort().join('|') : '');
+	const hasUnsavedVotingTargetChanges = (
+		votingTargetGeneration !== savedVotingTargetGeneration
+		|| normalizeProjectIds(configuredVotingProjectIds) !== normalizeProjectIds(savedVotingProjectIds)
+	);
+	const formattedVotingStartAt = formatVotingStartAt(adminVotingSettings.startAt);
+
+	const updateVotingVideoUploadState = (projectId, state) => {
+		setVotingVideoUploadState((current) => ({ ...current, [projectId]: state }));
+	};
+
+	const handleUploadVotingVideo = async (project, file) => {
+		const isMp4 = file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp4');
+		if (!isMp4) {
+			showToast('MP4 형식의 영상만 업로드할 수 있습니다.', 'error');
+			return;
+		}
+		if (file.size > MAX_VOTING_VIDEO_SIZE_BYTES) {
+			showToast('영상 파일은 100MB 이하로 업로드해주세요.', 'error');
+			return;
+		}
+
+		updateVotingVideoUploadState(project.id, { isUploading: true, progress: 0 });
+		let uploadedVideo = null;
+		try {
+			const durationSeconds = await getVideoDuration(file);
+			if (durationSeconds > MAX_VOTING_VIDEO_DURATION_SECONDS) {
+				throw new Error('영상은 5분 이하로 업로드해주세요.');
+			}
+
+			uploadedVideo = await uploadVotingVideo(file, {
+				projectId: project.id,
+				generation: savedVotingTargetGeneration,
+				onProgress: (progress) => updateVotingVideoUploadState(project.id, { isUploading: true, progress })
+			});
+			const result = await updateProject(project.id, {
+				votingVideo: {
+					...uploadedVideo,
+					durationSeconds: Math.round(durationSeconds),
+					uploadedAt: new Date().toISOString()
+				}
+			});
+			if (!result.success) throw new Error('프로젝트 영상 정보를 저장하지 못했습니다.');
+
+			if (project.votingVideo?.storagePath && project.votingVideo.storagePath !== uploadedVideo.storagePath) {
+				await deleteVotingVideo(project.votingVideo.storagePath);
+			}
+			showToast(`${project.team || project.title} 팀의 투표 영상이 등록되었습니다.`, 'success');
+		} catch (error) {
+			console.error('Voting video upload error:', error);
+			if (uploadedVideo?.storagePath) await deleteVotingVideo(uploadedVideo.storagePath);
+			showToast(error.message || '투표 영상 업로드에 실패했습니다.', 'error');
+		} finally {
+			updateVotingVideoUploadState(project.id, { isUploading: false, progress: 0 });
+		}
+	};
+
+	const handleDeleteVotingVideo = async (project) => {
+		if (!project.votingVideo?.downloadUrl) return;
+		if (!window.confirm(`"${project.team || project.title}" 팀의 투표 영상을 삭제하시겠습니까?`)) return;
+
+		updateVotingVideoUploadState(project.id, { isUploading: true, progress: 0 });
+		try {
+			const result = await updateProject(project.id, { votingVideo: null });
+			if (!result.success) throw new Error('프로젝트 영상 정보를 삭제하지 못했습니다.');
+			if (project.votingVideo.storagePath) await deleteVotingVideo(project.votingVideo.storagePath);
+			showToast('투표 영상이 삭제되었습니다.', 'success');
+		} catch (error) {
+			console.error('Voting video delete error:', error);
+			showToast(error.message || '투표 영상 삭제에 실패했습니다.', 'error');
+		} finally {
+			updateVotingVideoUploadState(project.id, { isUploading: false, progress: 0 });
+		}
+	};
+
 	const handleSyncData = async () => {
 		if (window.confirm(`${selectedGen}기의 ELO 레이팅, 수강생 투표 수, 대전 기록 데이터를 기존 투표 원본 로그를 기반으로 전체 재집계하시겠습니까?\n이 작업은 데이터 양에 따라 수 초가 걸릴 수 있습니다.`)) {
 			setSyncLoading(true);
 			try {
-				const res = await syncVotingData(selectedGen);
+				const res = await syncVotingData(
+					selectedGen,
+					getInitialEloForGeneration(adminVotingSettings, selectedGen),
+					getKFactorForGeneration(adminVotingSettings, selectedGen)
+				);
 				if (res.success) {
 					showToast(`성공적으로 데이터를 동기화했습니다! (총 ${res.voteCount}건 집계)`, 'success');
 					loadDashboardData();
@@ -921,6 +1299,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			{ key: 'generations', label: '기수 관리' },
 			{ key: 'password', label: '비밀번호 설정' },
 			{ key: 'projects', label: '프로젝트 관리' },
+			{ key: 'students', label: '학생 관리' },
 			{ key: 'voting', label: '투표 설정' },
 			{ key: 'dashboard', label: '심층 투표 분석' },
 		];
@@ -965,6 +1344,13 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 				label: '프로젝트 관리',
 				desc: '수강생 프로젝트 데이터를 어드민 권한으로 수정 및 제거합니다. (수강생 비번 불필요)',
 				color: 'purple'
+			},
+			{
+				key: 'students',
+				icon: Users,
+				label: '학생 관리',
+				desc: '기수별 학생을 조회하고 추가, 수정, 비활성화 또는 삭제합니다.',
+				color: 'blue'
 			},
 			{
 				key: 'voting',
@@ -1609,6 +1995,109 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 		</div>
 	);
 
+	const renderStudentsView = () => (
+		<div className="space-y-5">
+			<div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<h3 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
+						<Users className="w-4 h-4 text-blue-500" />
+						<span>학생 관리</span>
+					</h3>
+					<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">기수별 학생을 페이지 단위로 조회하고 관리합니다. 비활성 학생은 투표 및 팀원 선택에서 제외됩니다.</p>
+				</div>
+				<div className="flex items-center gap-2">
+					<select
+						value={studentManagementGeneration}
+						onChange={(event) => resetStudentManagementPage(Number(event.target.value))}
+						className="px-3 py-2 text-xs font-bold border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none"
+					>
+						{generations.map((generation) => <option key={generation.value} value={generation.value}>{generation.name}</option>)}
+					</select>
+					<button
+						type="button"
+						onClick={() => { setStudentEditTarget(null); setStudentForm(createStudentForm(studentManagementGeneration)); }}
+						className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-colors"
+					>
+						<UserPlus className="w-3.5 h-3.5" />
+						<span>학생 추가</span>
+					</button>
+				</div>
+			</div>
+
+			<div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+				<div className="xl:col-span-7 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+					<div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+						<div>
+							<p className="text-xs font-bold text-gray-900 dark:text-white">{studentManagementGeneration}기 학생 {studentTotal}명</p>
+							<p className="text-[11px] text-gray-400 mt-0.5">{studentPageIndex + 1}페이지 · 페이지당 {STUDENT_PAGE_SIZE}명</p>
+						</div>
+						<button type="button" onClick={refreshStudentManagementPage} disabled={studentManagementLoading} className="p-2 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50" title="새로고침">
+							<RefreshCw className={`w-3.5 h-3.5 ${studentManagementLoading ? 'animate-spin' : ''}`} />
+						</button>
+					</div>
+					<div className="overflow-x-auto min-h-[390px]">
+						{studentManagementLoading ? (
+							<div className="h-[390px] flex flex-col items-center justify-center gap-3 text-gray-400"><RefreshCw className="w-7 h-7 animate-spin" /><span className="text-xs">학생 정보를 불러오는 중...</span></div>
+						) : studentPage.length === 0 ? (
+							<div className="h-[390px] flex items-center justify-center text-xs text-gray-400">등록된 학생이 없습니다.</div>
+						) : (
+							<table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+								<thead className="bg-gray-50 dark:bg-gray-900/50">
+									<tr>
+										<th className="px-5 py-3 text-left text-[11px] font-bold text-gray-400">이름</th>
+										<th className="px-4 py-3 text-left text-[11px] font-bold text-gray-400">과정</th>
+										<th className="px-4 py-3 text-center text-[11px] font-bold text-gray-400">상태</th>
+										<th className="px-4 py-3 text-center text-[11px] font-bold text-gray-400">투표</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y divide-gray-100 dark:divide-gray-750">
+									{studentPage.map((student) => {
+										const active = isStudentActive(student);
+										return (
+											<tr key={student.id} onClick={() => selectStudentForEdit(student)} className={`cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/10 ${studentEditTarget?.id === student.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+												<td className="px-5 py-3.5"><p className="text-xs font-bold text-gray-900 dark:text-white">{student.name}</p><p className="text-[11px] text-gray-400 mt-0.5">{student.kor_name || '-'} · {student.birthdate || '-'}</p></td>
+												<td className="px-4 py-3.5 text-xs text-gray-500 dark:text-gray-400 font-semibold">{student.course}</td>
+												<td className="px-4 py-3.5 text-center"><span className={`px-2 py-1 rounded-md text-[11px] font-bold ${active ? 'bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>{active ? '활성' : '비활성'}</span></td>
+												<td className="px-4 py-3.5 text-center text-xs font-bold text-gray-600 dark:text-gray-300">{student.voteCount || 0}</td>
+											</tr>
+										);
+									})}
+								</tbody>
+							</table>
+						)}
+					</div>
+					<div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+						<button type="button" onClick={handleStudentPagePrevious} disabled={studentManagementLoading || studentPageIndex === 0} className="px-3 py-1.5 text-xs font-bold border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">이전</button>
+						<button type="button" onClick={handleStudentPageNext} disabled={studentManagementLoading || !studentHasNextPage} className="px-3 py-1.5 text-xs font-bold border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">다음</button>
+					</div>
+				</div>
+
+				<form onSubmit={handleSaveStudent} className="xl:col-span-5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 space-y-4 self-start">
+					<div className="flex items-center justify-between gap-3">
+						<div>
+							<h4 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2"><UserCog className="w-4 h-4 text-blue-500" />{studentEditTarget ? '학생 정보 수정' : '학생 추가'}</h4>
+							<p className="text-[11px] text-gray-400 mt-1">{studentEditTarget ? `학생 ID: ${studentEditTarget.id}` : '신규 학생은 활성 상태로 등록됩니다.'}</p>
+						</div>
+						{studentEditTarget && <button type="button" onClick={() => { setStudentEditTarget(null); setStudentForm(createStudentForm(studentManagementGeneration)); }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"><X className="w-4 h-4" /></button>}
+					</div>
+					<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
+						<div><label className="block text-[11px] font-bold text-gray-400 mb-1">표시 이름</label><input required value={studentForm.name} onChange={(event) => setStudentForm((form) => ({ ...form, name: event.target.value }))} placeholder="예: charlie.park(박천명)" className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-blue-400" /></div>
+						<div><label className="block text-[11px] font-bold text-gray-400 mb-1">국문 이름</label><input required value={studentForm.kor_name} onChange={(event) => setStudentForm((form) => ({ ...form, kor_name: event.target.value }))} placeholder="예: 박천명" className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-blue-400" /></div>
+						<div><label className="block text-[11px] font-bold text-gray-400 mb-1">과정</label><select value={studentForm.course} onChange={(event) => setStudentForm((form) => ({ ...form, course: event.target.value }))} className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-blue-400">{STUDENT_COURSES.map((course) => <option key={course} value={course}>{course}</option>)}</select></div>
+						<div><label className="block text-[11px] font-bold text-gray-400 mb-1">생년월일</label><input required inputMode="numeric" maxLength={6} value={studentForm.birthdate} onChange={(event) => setStudentForm((form) => ({ ...form, birthdate: event.target.value }))} placeholder="YYMMDD" className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-blue-400" /></div>
+						<div><label className="block text-[11px] font-bold text-gray-400 mb-1">기수</label><select value={studentForm.generation} onChange={(event) => setStudentForm((form) => ({ ...form, generation: Number(event.target.value) }))} className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-blue-400">{generations.map((generation) => <option key={generation.value} value={generation.value}>{generation.name}</option>)}</select></div>
+						<div><label className="block text-[11px] font-bold text-gray-400 mb-1">상태</label><select value={studentForm.status} onChange={(event) => setStudentForm((form) => ({ ...form, status: event.target.value }))} className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-blue-400"><option value="active">활성</option><option value="inactive">비활성</option></select></div>
+					</div>
+					{studentEditTarget && <p className="text-[11px] leading-relaxed text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3">기수를 변경해도 기존 투표 기록은 유지됩니다. 기존 프로젝트 팀원 이름은 자동으로 바뀌지 않습니다.</p>}
+					<div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-between gap-2">
+						{studentEditTarget ? <button type="button" onClick={handleDeleteStudent} disabled={studentSaving} className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-red-500 border border-red-100 dark:border-red-900/40 rounded-lg hover:bg-red-50 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" />삭제</button> : <span />}
+						<button type="submit" disabled={studentSaving} className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold"><Save className="w-3.5 h-3.5" />{studentSaving ? '저장 중...' : studentEditTarget ? '변경 저장' : '학생 등록'}</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	);
+
 	const renderVotingView = () => (
 		<div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 space-y-4">
 			<div>
@@ -1616,13 +2105,34 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 					<Vote className="w-4 h-4 text-green-500" />
 					<span>투표 관리 및 세팅</span>
 				</h3>
-				<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">투표 활성화 상태 및 대상 기수, 매치 시작 예약 일정을 설정합니다.</p>
+				<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">투표 설정과 ELO 참여 팀의 영상을 관리합니다.</p>
 			</div>
+			<div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-900">
+				<button
+					type="button"
+					onClick={() => setVotingManagementTab('settings')}
+					className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${votingManagementTab === 'settings' ? 'bg-white text-green-600 shadow-sm dark:bg-gray-800 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}
+				>
+					기본 설정
+				</button>
+				<button
+					type="button"
+					onClick={() => setVotingManagementTab('videos')}
+					className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${votingManagementTab === 'videos' ? 'bg-white text-green-600 shadow-sm dark:bg-gray-800 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}
+				>
+					투표 영상 관리
+				</button>
+			</div>
+			{votingManagementTab === 'settings' ? (
 			<div className="space-y-4 max-w-md pt-2">
 				<div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-750">
 					<div>
 						<p className="text-xs font-bold text-gray-900 dark:text-white">투표 활성화</p>
-						<p className="text-xs text-gray-400 mt-0.5">{adminVotingSettings.isActive ? '현재 투표가 활성화되어 실시간 진행 중입니다.' : '현재 투표가 비활성화되어 닫힌 상태입니다.'}</p>
+						<p className="text-xs text-gray-400 mt-0.5">
+							{adminVotingSettings.isActive
+								? (formattedVotingStartAt ? `${formattedVotingStartAt}에 자동으로 투표가 열립니다.` : '저장 즉시 투표가 열립니다.')
+								: '현재 투표가 비활성화되어 닫힌 상태입니다.'}
+						</p>
 					</div>
 					<button
 						onClick={() => setAdminVotingSettings(v => ({ ...v, isActive: !v.isActive }))}
@@ -1658,7 +2168,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 					<div className="flex items-start justify-between gap-3">
 						<div>
 							<p className="text-xs font-bold text-gray-900 dark:text-white">ELO 참여 팀 선별</p>
-							<p className="text-xs text-gray-400 mt-0.5">선택한 팀만 매치업과 ELO 랭킹에 포함됩니다. 설정하지 않은 기수는 전체 팀이 참여합니다.</p>
+							<p className="text-xs text-gray-400 mt-0.5">선택한 팀만 매치업·랭킹·투표 영상 관리에 포함됩니다. 4기부터는 대상 선택을 저장해야 합니다.</p>
 						</div>
 						<span className="shrink-0 px-2 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-[11px] font-bold">
 							{selectedVotingProjectIds.size}팀 선택
@@ -1708,16 +2218,144 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 								})}
 							</div>
 						</>
-					)}
-				</div>
+						)}
+					</div>
+					<div className="p-4 bg-blue-50/70 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/50 space-y-4">
+						<div>
+							<p className="text-xs font-bold text-gray-900 dark:text-white">학생 1명당 매치 판수</p>
+							<p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+								자동 계산은 95% 신뢰수준과 ±10%p 오차를 기준으로 합니다. 본선팀 인원은 선택된 팀에 소속된 전체 학생 수를 입력해주세요.
+							</p>
+						</div>
+						<div className="grid grid-cols-2 gap-2">
+							<button
+								type="button"
+								onClick={() => updateCurrentMatchPolicy({ mode: 'auto' })}
+								className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${currentMatchPolicy.mode !== 'manual'
+									? 'border-blue-400 bg-blue-500 text-white'
+									: 'border-gray-200 bg-white text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400'}`}
+							>
+								자동 계산
+							</button>
+							<button
+								type="button"
+								onClick={() => updateCurrentMatchPolicy({ mode: 'manual' })}
+								className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${currentMatchPolicy.mode === 'manual'
+									? 'border-blue-400 bg-blue-500 text-white'
+									: 'border-gray-200 bg-white text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400'}`}
+							>
+								직접 입력
+							</button>
+						</div>
+						<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+							<label className="space-y-1">
+								<span className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300">투표 참여 인원</span>
+								<input
+									type="number"
+									min="1"
+									step="1"
+									value={currentMatchPolicy.voterCount}
+									onChange={(event) => updateCurrentMatchPolicy({ voterCount: event.target.value === '' ? '' : Number(event.target.value) })}
+									className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-bold text-gray-900 outline-none focus:border-blue-400 dark:border-blue-900/60 dark:bg-gray-900 dark:text-white"
+								/>
+							</label>
+							<label className="space-y-1">
+								<span className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300">본선팀 소속 인원</span>
+								<input
+									type="number"
+									min="0"
+									step="1"
+									value={currentMatchPolicy.finalistMemberCount}
+									onChange={(event) => updateCurrentMatchPolicy({ finalistMemberCount: event.target.value === '' ? '' : Number(event.target.value) })}
+									className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-bold text-gray-900 outline-none focus:border-blue-400 dark:border-blue-900/60 dark:bg-gray-900 dark:text-white"
+								/>
+							</label>
+							<label className="space-y-1">
+								<span className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300">투표 대상 팀</span>
+								<input
+									type="number"
+									value={selectedVotingProjectIds.size}
+									readOnly
+									className="w-full cursor-not-allowed rounded-lg border border-blue-100 bg-gray-100 px-3 py-2 text-sm font-bold text-gray-600 dark:border-blue-900/60 dark:bg-gray-800 dark:text-gray-300"
+								/>
+							</label>
+							<label className="space-y-1">
+								<span className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300">초기 Elo</span>
+								<input
+									type="number"
+									min="1"
+									step="1"
+									value={currentMatchPolicy.initialElo}
+									onChange={(event) => updateCurrentMatchPolicy({ initialElo: event.target.value === '' ? '' : Number(event.target.value) })}
+									className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-bold text-gray-900 outline-none focus:border-blue-400 dark:border-blue-900/60 dark:bg-gray-900 dark:text-white"
+								/>
+							</label>
+							<label className="space-y-1">
+								<span className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300">Elo K-factor</span>
+								<input
+									type="number"
+									min="1"
+									step="1"
+									value={currentMatchPolicy.kFactor}
+									onChange={(event) => updateCurrentMatchPolicy({ kFactor: event.target.value === '' ? '' : Number(event.target.value) })}
+									className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-bold text-gray-900 outline-none focus:border-blue-400 dark:border-blue-900/60 dark:bg-gray-900 dark:text-white"
+								/>
+							</label>
+						</div>
+						{currentMatchPolicy.mode === 'manual' && (
+							<label className="block space-y-1">
+								<span className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+									직접 지정할 판수 (최대 {getPairCount(selectedVotingProjectIds.size)}판)
+								</span>
+								<input
+									type="number"
+									min="1"
+									max={getPairCount(selectedVotingProjectIds.size)}
+									step="1"
+									value={currentMatchPolicy.manualMatchesPerVoter}
+									onChange={(event) => updateCurrentMatchPolicy({ manualMatchesPerVoter: event.target.value === '' ? '' : Number(event.target.value) })}
+									className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-bold text-gray-900 outline-none focus:border-blue-400 dark:border-blue-900/60 dark:bg-gray-900 dark:text-white"
+								/>
+							</label>
+						)}
+						{currentAutoMatchCalculation.isValid ? (
+							<div className="rounded-lg bg-white p-3 dark:bg-gray-900">
+								<div className="flex items-end justify-between gap-3">
+									<div>
+										<p className="text-[11px] text-gray-500 dark:text-gray-400">{currentMatchPolicy.mode === 'manual' ? '최종 적용 판수' : '자동 권장 판수'}</p>
+										<p className="text-2xl font-black text-blue-600 dark:text-blue-400">1명당 {previewMatchesPerVoter}판</p>
+									</div>
+									<span className="text-right text-[10px] leading-relaxed text-gray-400">
+										전체 {currentAutoMatchCalculation.pairCount}쌍<br />쌍당 목표 {currentAutoMatchCalculation.sampleSizePerPair}표
+									</span>
+								</div>
+								<p className="mt-2 text-[10px] leading-relaxed text-gray-400">
+									초기 {currentMatchPolicy.initialElo || '-'}점 · K={currentMatchPolicy.kFactor || '-'} · 팀당 평균 {currentAutoMatchCalculation.averageMembersPerFinalistTeam.toFixed(1)}명 가정 · 특정 팀 쌍 평가 가능 약 {Math.floor(currentAutoMatchCalculation.eligibleVotersPerPair)}명 · 전체 목표 {currentAutoMatchCalculation.targetTotalMatches.toLocaleString()}표
+								</p>
+							</div>
+						) : (
+							<p className="rounded-lg bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-600 dark:bg-red-950/30 dark:text-red-300">
+								{currentAutoMatchCalculation.error}
+							</p>
+						)}
+					</div>
 				<div>
-					<label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">투표 시작 예약 일정 <span className="text-gray-400 font-normal">(선택사항)</span></label>
+					<label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">투표 시작 예약 일정 <span className="text-gray-400 font-normal">(선택사항 · 한국 시간)</span></label>
 					<input
 						type="datetime-local"
 						value={adminVotingSettings.startDate || ''}
-						onChange={(e) => setAdminVotingSettings(v => ({ ...v, startDate: e.target.value }))}
+						onChange={(e) => setAdminVotingSettings(v => ({
+							...v,
+							startDate: e.target.value,
+							startAt: parseSeoulDateTimeInput(e.target.value),
+							legacyStartDate: ''
+						}))}
 						className="w-full px-3.5 py-2.5 text-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400"
 					/>
+					<p className="mt-1.5 text-[11px] text-gray-400">활성화 상태에서 예약 시간을 지정하면 해당 시간이 지나야 투표 화면이 열립니다.</p>
+					{adminVotingSettings.legacyStartDate && (
+						<p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">기존 안내 문구 “{adminVotingSettings.legacyStartDate}”는 시간 비교에 사용할 수 없습니다. 정확한 예약 시간을 다시 저장해주세요.</p>
+					)}
 				</div>
 				<div className="flex justify-end pt-4 border-t border-gray-100 dark:border-gray-700">
 					<button
@@ -1730,6 +2368,33 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 					</button>
 				</div>
 			</div>
+			) : (
+				<div className="max-w-2xl pt-2">
+					{hasUnsavedVotingTargetChanges ? (
+						<div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-5 py-10 text-center dark:border-amber-800 dark:bg-amber-950/20">
+							<AlertCircle className="mx-auto mb-2 h-5 w-5 text-amber-500" />
+							<p className="text-xs font-bold text-amber-800 dark:text-amber-200">투표 대상 변경사항을 먼저 저장해주세요.</p>
+							<p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">영상은 마지막으로 저장된 투표 대상 팀에게만 등록할 수 있습니다.</p>
+							<button type="button" onClick={() => setVotingManagementTab('settings')} className="mt-4 rounded-lg bg-amber-500 px-3 py-2 text-[11px] font-bold text-white hover:bg-amber-600">기본 설정으로 이동</button>
+						</div>
+					) : missingSavedVotingProjectCount > 0 ? (
+						<div className="rounded-xl border border-red-200 bg-red-50 px-5 py-10 text-center dark:border-red-900/60 dark:bg-red-950/20">
+							<AlertCircle className="mx-auto mb-2 h-5 w-5 text-red-500" />
+							<p className="text-xs font-bold text-red-700 dark:text-red-300">저장된 투표 대상 중 삭제되었거나 찾을 수 없는 팀이 {missingSavedVotingProjectCount}개 있습니다.</p>
+							<p className="mt-1 text-[11px] text-red-600 dark:text-red-400">기본 설정에서 투표 대상을 다시 저장해주세요.</p>
+						</div>
+					) : (
+						<VotingVideoManager
+							projects={savedVotingVideoProjects}
+							uploadStateByProject={votingVideoUploadState}
+							onUpload={handleUploadVotingVideo}
+							onDelete={handleDeleteVotingVideo}
+							maxSizeMb={MAX_VOTING_VIDEO_SIZE_BYTES / 1024 / 1024}
+							maxDurationSeconds={MAX_VOTING_VIDEO_DURATION_SECONDS}
+						/>
+					)}
+				</div>
+			)}
 		</div>
 	);
 
@@ -2239,6 +2904,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			{currentView === 'generations' && renderGenerationsView()}
 			{currentView === 'password' && renderPasswordView()}
 			{currentView === 'projects' && renderProjectsView()}
+			{currentView === 'students' && renderStudentsView()}
 			{currentView === 'voting' && renderVotingView()}
 			{currentView === 'dashboard' && renderDashboardView()}
 		</div>

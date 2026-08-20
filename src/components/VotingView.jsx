@@ -1,36 +1,37 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import {
 	Trophy, Vote, Lock, Mail, ArrowRight, LogOut,
-	RefreshCw, Settings, CheckCircle2, AlertCircle,
-	Crown, Medal, Shield, Eye, Play, Square, Info, Calendar
+	RefreshCw, CheckCircle2, AlertCircle,
+	Crown, Medal, Eye, Info, Calendar
 } from 'lucide-react';
 import ImageWithLoader from './ImageWithLoader';
 import { trackVoteMatchup, logCustomEvent, trackVoterAuth, trackVoterLogout, logScreenView, setUserProperties, getDeviceType, getDeviceOS, parseBirthYear, getAgeGroup } from '../lib/analytics';
 import {
 	getVotingSettings,
-	saveVotingSettings,
+	subscribeToVotingSettings,
 	verifyStudentVoter,
 	submitVote,
-	getVoterVotes,
-	db
+	getVoterVotes
 } from '../lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { getBrowserStorageKey } from '../lib/environment';
+import {
+	formatVotingStartAt,
+	getEligibleProjectIdSet,
+	getVotingScheduleStatus,
+	hasSavedVotingTargets,
+	requiresExplicitVotingTargets
+} from '../lib/votingSettings';
+import {
+	getConfiguredMatchesPerVoter,
+	getInitialEloForGeneration,
+	getKFactorForGeneration
+} from '../lib/votingMatchPolicy';
 
-const K_FACTOR = 32;
-const INITIAL_ELO = 1200;
-const MAX_VOTES_PER_USER = 40;
-
-const getEligibleProjectIds = (settings, generation) => {
-	const byGeneration = settings?.eligibleProjectIdsByGeneration;
-	if (!byGeneration || typeof byGeneration !== 'object' || Array.isArray(byGeneration)) return null;
-
-	const projectIds = byGeneration[String(Number(generation))];
-	return Array.isArray(projectIds) ? new Set(projectIds) : null;
-};
+const VOTER_STORAGE_KEY = getBrowserStorageKey('ktb_voter');
 
 const preprocessMarkdown = (text) => {
 	if (!text) return '';
@@ -54,7 +55,7 @@ const preprocessMarkdown = (text) => {
 };
 
 const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) => {
-	// Active main tab: 'vote' or 'ranking' or 'admin'
+	// Active main tab: 'vote' or 'ranking'
 	const [activeTab, setActiveTab] = useState('vote');
 
 	// Settings State
@@ -63,7 +64,7 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 
 	// Voter Auth State
 	const [voter, setVoter] = useState(() => {
-		const saved = localStorage.getItem('ktb_voter');
+		const saved = localStorage.getItem(VOTER_STORAGE_KEY);
 		return saved ? JSON.parse(saved) : null;
 	});
 
@@ -72,40 +73,31 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 	const [birthdate, setBirthdate] = useState('');
 	const [authLoading, setAuthLoading] = useState(false);
 	const [authError, setAuthError] = useState('');
-	const [showAdminLogin, setShowAdminLogin] = useState(false);
+	const [currentTime, setCurrentTime] = useState(() => new Date());
 
 	// Voting State
 	const [voterVotes, setVoterVotes] = useState([]);
 	const [votingLoading, setVotingLoading] = useState(false);
 	const [currentPair, setCurrentPair] = useState(null);
+	const [playingVideoProjectId, setPlayingVideoProjectId] = useState(null);
+	const votingVideoRefs = useRef({});
 	const [skippedPairs, setSkippedPairs] = useState(new Set());
 
 	// Ranking State
 	const [rankingGen, setRankingGen] = useState(4);
 
-	// Admin Edit State
-	const [adminIsActive, setAdminIsActive] = useState(false);
-	const [adminGen, setAdminGen] = useState(4);
-	const [adminStartDate, setAdminStartDate] = useState('');
-	const [adminSaving, setAdminSaving] = useState(false);
-
 	// 1. Subscribe to Voting Settings in real-time
 	useEffect(() => {
-		const docRef = doc(db, "settings", "voting");
-		const unsubscribe = onSnapshot(docRef, (docSnap) => {
-			if (docSnap.exists()) {
-				const data = docSnap.data();
+		const unsubscribe = subscribeToVotingSettings((data) => {
+			if (data) {
 				setSettings(data);
-				setAdminIsActive(data.isActive);
-				setAdminGen(data.generation);
 				setRankingGen(data.generation);
-				setAdminStartDate(data.startDate || '');
 			} else {
-				saveVotingSettings({ isActive: true, generation: 4, startDate: "" });
+				// 환경별 기본값 생성은 Firebase 데이터 계층에서만 처리합니다.
+				getVotingSettings();
 			}
 			setSettingsLoading(false);
-		}, (err) => {
-			console.error("Settings subscription error:", err);
+		}, () => {
 			setSettingsLoading(false);
 		});
 
@@ -185,7 +177,7 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 			if (res.success) {
 				const voterData = res.voter;
 				setVoter(voterData);
-				localStorage.setItem('ktb_voter', JSON.stringify(voterData));
+				localStorage.setItem(VOTER_STORAGE_KEY, JSON.stringify(voterData));
 				trackVoterAuth(true, selectedCourse, settings.generation);
 				showToast(`${voterData.name}님, 인증되었습니다.`, 'success');
 				setVoterName('');
@@ -205,7 +197,7 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 
 	const handleLogout = () => {
 		setVoter(null);
-		localStorage.removeItem('ktb_voter');
+		localStorage.removeItem(VOTER_STORAGE_KEY);
 		setVoterVotes([]);
 		setCurrentPair(null);
 		setSkippedPairs(new Set());
@@ -215,13 +207,14 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 
 	// --- ELO Ranking Board Calculation ---
 	const eloRankings = useMemo(() => {
-		const eligibleProjectIds = getEligibleProjectIds(settings, rankingGen);
+		const eligibleProjectIds = getEligibleProjectIdSet(settings, rankingGen);
+		const initialElo = getInitialEloForGeneration(settings, rankingGen);
 		const genProjects = projects.filter(p =>
 			(p.generation || 3) === rankingGen && (!eligibleProjectIds || eligibleProjectIds.has(p.id))
 		);
 		return genProjects.map(p => ({
 			...p,
-			elo: p.elo || 1200,
+			elo: Number.isFinite(Number(p.elo)) ? Number(p.elo) : initialElo,
 			wins: p.wins || 0,
 			losses: p.losses || 0,
 			totalMatches: p.totalMatches || 0
@@ -229,22 +222,67 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 	}, [projects, rankingGen, settings]);
 
 	// --- Matchup Pairing Logic ---
-	const activeGenProjects = useMemo(() => {
-		const eligibleProjectIds = getEligibleProjectIds(settings, settings.generation);
-		let list = projects.filter(p =>
+	const eligibleGenerationProjects = useMemo(() => {
+		const eligibleProjectIds = getEligibleProjectIdSet(settings, settings.generation);
+		return projects.filter(p =>
 			(p.generation || 3) === settings.generation && (!eligibleProjectIds || eligibleProjectIds.has(p.id))
 		);
+	}, [projects, settings]);
+
+	const activeGenProjects = useMemo(() => {
+		let list = eligibleGenerationProjects;
 		if (voter && !voter.isAdmin) {
 			list = list.filter(p => !(p.members || []).includes(voter.email) && !(p.members || []).includes(voter.name));
 		}
 		return list;
-	}, [projects, settings, voter]);
+	}, [eligibleGenerationProjects, voter]);
+
+	const votingGeneration = Number(settings.generation) || 4;
+	const requiresExplicitTargets = requiresExplicitVotingTargets(votingGeneration);
+	const hasConfiguredVotingTargets = hasSavedVotingTargets(settings, votingGeneration);
+	const isVotingReady = !requiresExplicitTargets || (
+		hasConfiguredVotingTargets
+		&& eligibleGenerationProjects.length >= 2
+	);
+	const votingSchedule = useMemo(
+		() => getVotingScheduleStatus(settings, currentTime),
+		[settings, currentTime]
+	);
+	const isVotingOpen = votingSchedule.isOpen && isVotingReady;
+	const votingStartAtText = formatVotingStartAt(votingSchedule.startAt);
+
+	useEffect(() => {
+		if (!votingSchedule.isScheduled || !votingSchedule.startAt) return undefined;
+
+		const updateTime = () => setCurrentTime(new Date());
+		const remainingMs = Math.max(0, votingSchedule.startAt.getTime() - Date.now());
+		const openTimer = window.setTimeout(updateTime, remainingMs + 50);
+		const refreshTimer = window.setInterval(updateTime, 30_000);
+		return () => {
+			window.clearTimeout(openTimer);
+			window.clearInterval(refreshTimer);
+		};
+	}, [votingSchedule.isScheduled, votingSchedule.startAt]);
+
+	useEffect(() => {
+		if (!isVotingOpen) setCurrentPair(null);
+	}, [isVotingOpen]);
 
 	useEffect(() => {
 		if (currentPair && !currentPair.every((project) => activeGenProjects.some((activeProject) => activeProject.id === project.id))) {
 			setCurrentPair(null);
 		}
 	}, [activeGenProjects, currentPair]);
+
+	useEffect(() => {
+		Object.entries(votingVideoRefs.current).forEach(([projectId, video]) => {
+			if (projectId !== playingVideoProjectId && video && !video.paused) video.pause();
+		});
+	}, [playingVideoProjectId]);
+
+	useEffect(() => {
+		setPlayingVideoProjectId(null);
+	}, [currentPair]);
 
 	const allPairs = useMemo(() => {
 		const pairs = [];
@@ -256,19 +294,26 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 		}
 		return pairs;
 	}, [activeGenProjects]);
+	const eligiblePairKeys = useMemo(() => new Set(
+		allPairs.map(([projectA, projectB]) => [projectA.id, projectB.id].sort().join('_'))
+	), [allPairs]);
+	const configuredMatchesPerVoter = getConfiguredMatchesPerVoter(settings, settings.generation);
+	const initialElo = getInitialEloForGeneration(settings, settings.generation);
+	const kFactor = getKFactorForGeneration(settings, settings.generation);
 
 	const targetMatches = useMemo(() => {
-		return Math.min(MAX_VOTES_PER_USER, allPairs.length);
-	}, [allPairs]);
+		return Math.min(configuredMatchesPerVoter, allPairs.length);
+	}, [allPairs.length, configuredMatchesPerVoter]);
 
 	const votedPairKeysSet = useMemo(() => {
 		const keys = new Set();
 		voterVotes.forEach(vote => {
 			const sortedIds = [vote.projectA, vote.projectB].sort();
-			keys.add(sortedIds.join('_'));
+			const pairKey = sortedIds.join('_');
+			if (eligiblePairKeys.has(pairKey)) keys.add(pairKey);
 		});
 		return keys;
-	}, [voterVotes]);
+	}, [eligiblePairKeys, voterVotes]);
 
 	const unvotedPairs = useMemo(() => {
 		return allPairs.filter(pair => {
@@ -278,10 +323,10 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 	}, [allPairs, votedPairKeysSet, skippedPairs]);
 
 	useEffect(() => {
-		if (voter && settings.isActive && !votingLoading && votedPairKeysSet.size < targetMatches && unvotedPairs.length > 0 && !currentPair) {
+		if (voter && isVotingOpen && !votingLoading && votedPairKeysSet.size < targetMatches && unvotedPairs.length > 0 && !currentPair) {
 			selectRandomPair();
 		}
-	}, [voter, settings.isActive, unvotedPairs, currentPair, votingLoading, votedPairKeysSet.size, targetMatches]);
+	}, [voter, isVotingOpen, unvotedPairs, currentPair, votingLoading, votedPairKeysSet.size, targetMatches]);
 
 	const selectRandomPair = () => {
 		if (unvotedPairs.length === 0) {
@@ -317,6 +362,11 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 	};
 
 	const handleVote = async (winnerId) => {
+		if (!isVotingOpen) {
+			setCurrentPair(null);
+			showToast("투표가 아직 열리지 않았거나 준비 중입니다.", 'info');
+			return;
+		}
 		if (!voter || !currentPair) return;
 		const [projA, projB] = currentPair;
 		const activeProjectIds = new Set(activeGenProjects.map((project) => project.id));
@@ -345,8 +395,10 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 				voter.email,
 				projA.id,
 				projB.id,
-				winnerId,
-				settings.generation
+					winnerId,
+					settings.generation,
+					initialElo,
+					kFactor
 			);
 		} catch (error) {
 			console.error("Error submitting vote:", error);
@@ -380,28 +432,6 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 		logCustomEvent('reset_skipped_matchups');
 	};
 
-	const handleSaveAdminSettings = async (e) => {
-		e.preventDefault();
-		setAdminSaving(true);
-		try {
-			const res = await saveVotingSettings({
-				isActive: adminIsActive,
-				generation: Number(adminGen),
-				startDate: adminStartDate.trim()
-			});
-			if (res.success) {
-				showToast("투표 설정이 성공적으로 저장되었습니다.", 'success');
-			} else {
-				showToast("설정 저장에 실패했습니다.", 'error');
-			}
-		} catch (error) {
-			console.error("Admin save error:", error);
-			showToast("설정 저장 중 오류가 발생했습니다.", 'error');
-		} finally {
-			setAdminSaving(false);
-		}
-	};
-
 	const progressPercent = targetMatches > 0
 		? Math.min(100, Math.round((votedPairKeysSet.size / targetMatches) * 100))
 		: 0;
@@ -431,18 +461,6 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 						<Trophy className="w-4 h-4" />
 						<span>투표 랭킹</span>
 					</button>
-					{voter?.isAdmin && (
-						<button
-							onClick={() => setActiveTab('admin')}
-							className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${activeTab === 'admin'
-								? 'bg-red-500 text-white shadow-sm'
-								: 'text-red-400 hover:text-red-600 dark:hover:text-red-300'
-								}`}
-						>
-							<Shield className="w-4 h-4" />
-							<span>관리자 도구</span>
-						</button>
-					)}
 				</div>
 
 				{voter && (
@@ -479,18 +497,26 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 								transition={{ duration: 0.25 }}
 								className="flex flex-col flex-1"
 							>
-								{!settings.isActive && (!voter || !voter.isAdmin) && !showAdminLogin ? (
-									/* 2. Voting Inactive Screen */
+								{!isVotingOpen ? (
+									/* Voting unavailable, scheduled, or not ready */
 									<div className="max-w-md w-full mx-auto text-center py-12 px-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl my-auto">
 										<div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
 											<Calendar className="w-8 h-8" />
 										</div>
-										<h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">투표 시작 전입니다</h3>
+										<h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+											{votingSchedule.isScheduled ? '투표 시작 전입니다' : !votingSchedule.isActive ? '투표가 닫혀 있습니다' : !isVotingReady ? '투표 준비 중입니다' : '투표가 닫혀 있습니다'}
+										</h3>
 										<p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
-											아직 공식 ELO 투표가 시작되지 않았습니다.<br />
-											{settings.startDate ? (
+											{votingSchedule.isScheduled ? '설정된 시작 시간이 지나면 투표가 자동으로 열립니다.' : !votingSchedule.isActive ? '현재 공식 ELO 투표가 열려 있지 않습니다.' : !isVotingReady ? '관리자가 투표 대상과 영상을 준비하고 있습니다.' : '현재 공식 ELO 투표가 열려 있지 않습니다.'}<br />
+											{votingSchedule.isScheduled && votingStartAtText ? (
 												<span className="inline-block mt-2.5 font-bold text-kakao-black dark:text-kakao-yellow bg-kakao-yellow/10 px-3.5 py-2 rounded-xl border border-kakao-yellow/20">
-													투표 시작 예정: {settings.startDate}
+													투표 시작 예정: {votingStartAtText}
+												</span>
+											) : votingSchedule.isActive && !isVotingReady && requiresExplicitTargets ? (
+												<span className="inline-block mt-2.5 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3.5 py-2 rounded-xl border border-amber-100 dark:border-amber-900/40">
+													{!hasConfiguredVotingTargets
+														? '투표 대상 팀을 설정하는 중입니다.'
+															: '투표 대상 팀을 확인하는 중입니다.'}
 												</span>
 											) : (
 												"투표 오픈 일정이 확정되는 대로 공개됩니다."
@@ -502,12 +528,6 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 												className="w-full py-2.5 bg-kakao-yellow hover:bg-yellow-400 text-kakao-black font-bold rounded-xl shadow-sm transition-colors text-sm"
 											>
 												이전 투표 결과 (랭킹) 보기
-											</button>
-											<button
-												onClick={() => setShowAdminLogin(true)}
-												className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mt-2 underline"
-											>
-												관리자 로그인
 											</button>
 										</div>
 									</div>
@@ -598,18 +618,6 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 												)}
 											</button>
 
-											{!settings.isActive && (
-												<button
-													type="button"
-													onClick={() => {
-														setShowAdminLogin(false);
-														setAuthError('');
-													}}
-													className="w-full py-2 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-xl text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-												>
-													돌아가기
-												</button>
-											)}
 										</form>
 									</div>
 								) : activeGenProjects.length < 2 ? (
@@ -685,11 +693,23 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 															animate={{ opacity: 1, x: 0 }}
 															exit={{ opacity: 0, x: -30 }}
 															transition={{ duration: 0.3 }}
-															onClick={() => handleVote(currentPair[0].id)}
-															className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-2xl hover:border-kakao-yellow dark:hover:border-kakao-yellow transition-all duration-300 flex flex-col group relative transform hover:-translate-y-1"
+															className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-2xl hover:border-kakao-yellow dark:hover:border-kakao-yellow transition-all duration-300 flex flex-col group relative transform hover:-translate-y-1"
 														>
-															<div className="h-44 bg-gray-100 dark:bg-gray-700 relative overflow-hidden flex-shrink-0">
-																{currentPair[0].imageUrl ? (
+															<div className="aspect-video bg-gray-100 dark:bg-gray-700 relative overflow-hidden flex-shrink-0">
+																{currentPair[0].votingVideo?.downloadUrl ? (
+																	<video
+																		ref={(element) => { votingVideoRefs.current[currentPair[0].id] = element; }}
+																		src={currentPair[0].votingVideo.downloadUrl}
+																		poster={currentPair[0].thumbnailUrl || currentPair[0].imageUrl || undefined}
+																		controls
+																		playsInline
+																		preload="metadata"
+																		onPlay={() => setPlayingVideoProjectId(currentPair[0].id)}
+																		className="h-full w-full bg-black object-contain"
+																	>
+																		<p>이 브라우저는 투표 영상 재생을 지원하지 않습니다.</p>
+																	</video>
+																) : currentPair[0].imageUrl ? (
 																	<ImageWithLoader
 																		src={currentPair[0].imageUrl}
 																		alt={currentPair[0].title}
@@ -720,12 +740,10 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 																	)}
 
 																</div>
-																<button
-																	onClick={(e) => { e.stopPropagation(); onProjectClick(currentPair[0]); }}
-																	className="w-full py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-bold rounded-xl text-xs transition-colors border border-gray-205 dark:border-gray-700"
-																>
-																	상세 설명 & 스펙 보기
-																</button>
+																<div className="mt-4 grid grid-cols-2 gap-2">
+																	<button onClick={() => handleVote(currentPair[0].id)} className="py-2 bg-kakao-yellow hover:bg-yellow-400 text-kakao-black font-bold rounded-xl text-xs transition-colors">이 팀에 투표</button>
+																	<button onClick={() => onProjectClick(currentPair[0])} className="py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-bold rounded-xl text-xs transition-colors border border-gray-200 dark:border-gray-700">상세 보기</button>
+																</div>
 															</div>
 															{/* Vote Hover Overlay */}
 															<div className="absolute inset-0 bg-kakao-yellow/5 dark:bg-kakao-yellow/2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl border-2 border-transparent group-hover:border-kakao-yellow" />
@@ -743,11 +761,23 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 															animate={{ opacity: 1, x: 0 }}
 															exit={{ opacity: 0, x: 30 }}
 															transition={{ duration: 0.3 }}
-															onClick={() => handleVote(currentPair[1].id)}
-															className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-2xl hover:border-kakao-yellow dark:hover:border-kakao-yellow transition-all duration-300 flex flex-col group relative transform hover:-translate-y-1"
+															className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-2xl hover:border-kakao-yellow dark:hover:border-kakao-yellow transition-all duration-300 flex flex-col group relative transform hover:-translate-y-1"
 														>
-															<div className="h-44 bg-gray-100 dark:bg-gray-700 relative overflow-hidden flex-shrink-0">
-																{currentPair[1].imageUrl ? (
+															<div className="aspect-video bg-gray-100 dark:bg-gray-700 relative overflow-hidden flex-shrink-0">
+																{currentPair[1].votingVideo?.downloadUrl ? (
+																	<video
+																		ref={(element) => { votingVideoRefs.current[currentPair[1].id] = element; }}
+																		src={currentPair[1].votingVideo.downloadUrl}
+																		poster={currentPair[1].thumbnailUrl || currentPair[1].imageUrl || undefined}
+																		controls
+																		playsInline
+																		preload="metadata"
+																		onPlay={() => setPlayingVideoProjectId(currentPair[1].id)}
+																		className="h-full w-full bg-black object-contain"
+																	>
+																		<p>이 브라우저는 투표 영상 재생을 지원하지 않습니다.</p>
+																	</video>
+																) : currentPair[1].imageUrl ? (
 																	<ImageWithLoader
 																		src={currentPair[1].imageUrl}
 																		alt={currentPair[1].title}
@@ -778,12 +808,10 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 																	)}
 
 																</div>
-																<button
-																	onClick={(e) => { e.stopPropagation(); onProjectClick(currentPair[1]); }}
-																	className="w-full py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-bold rounded-xl text-xs transition-colors border border-gray-200 dark:border-gray-700"
-																>
-																	상세 설명 & 스펙 보기
-																</button>
+																<div className="mt-4 grid grid-cols-2 gap-2">
+																	<button onClick={() => handleVote(currentPair[1].id)} className="py-2 bg-kakao-yellow hover:bg-yellow-400 text-kakao-black font-bold rounded-xl text-xs transition-colors">이 팀에 투표</button>
+																	<button onClick={() => onProjectClick(currentPair[1])} className="py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-bold rounded-xl text-xs transition-colors border border-gray-200 dark:border-gray-700">상세 보기</button>
+																</div>
 															</div>
 															{/* Vote Hover Overlay */}
 															<div className="absolute inset-0 bg-kakao-yellow/5 dark:bg-kakao-yellow/2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl border-2 border-transparent group-hover:border-kakao-yellow" />
@@ -959,98 +987,6 @@ const VotingView = ({ projects, onProjectClick, showToast, generations = [] }) =
 							</motion.div>
 						)}
 
-						{activeTab === 'admin' && voter?.isAdmin && (
-							/* Admin Settings Controls */
-							<motion.div
-								key="admin-tab"
-								initial={{ opacity: 0, y: 15 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, y: -15 }}
-								transition={{ duration: 0.25 }}
-								className="max-w-md w-full mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl p-8 my-auto"
-							>
-								<div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100 dark:border-gray-700">
-									<Settings className="w-5 h-5 text-red-500 animate-spin" style={{ animationDuration: '6s' }} />
-									<h3 className="text-lg font-bold text-gray-900 dark:text-white">투표 설정 (관리자 전용)</h3>
-								</div>
-
-								<form onSubmit={handleSaveAdminSettings} className="space-y-6">
-									{/* Active Toggle */}
-									<div>
-										<label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 ml-1">투표 활성화 상태</label>
-										<div className="flex gap-2">
-											<button
-												type="button"
-												onClick={() => setAdminIsActive(true)}
-												className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border text-sm ${adminIsActive
-													? 'bg-green-500 text-white border-transparent shadow-sm'
-													: 'bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-													}`}
-											>
-												<Play className="w-4 h-4" />
-												<span>투표 진행 (Active)</span>
-											</button>
-											<button
-												type="button"
-												onClick={() => setAdminIsActive(false)}
-												className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border text-sm ${!adminIsActive
-													? 'bg-red-500 text-white border-transparent shadow-sm'
-													: 'bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-													}`}
-											>
-												<Square className="w-4 h-4" />
-												<span>투표 종료 (Inactive)</span>
-											</button>
-										</div>
-									</div>
-
-									{/* Generation Cohort Input */}
-									<div>
-										<label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 ml-1">투표 진행 기수</label>
-										<select
-											value={adminGen}
-											onChange={(e) => setAdminGen(Number(e.target.value))}
-											className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 focus:border-kakao-yellow focus:ring-kakao-yellow bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 transition-all text-sm font-bold cursor-pointer"
-										>
-											{generations.map(gen => (
-												<option key={gen.value} value={gen.value}>{gen.name} 프로젝트 투표</option>
-											))}
-										</select>
-										<span className="text-[10px] text-gray-450 mt-1 block">
-											* 설정한 기수의 프로젝트들이 무작위로 매칭되며 랭킹보드 기준이 됩니다.
-										</span>
-									</div>
-
-									{/* Vote Start Date Input */}
-									<div>
-										<label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 ml-1">투표 시작 시간 및 안내</label>
-										<input
-											type="text"
-											value={adminStartDate}
-											onChange={(e) => setAdminStartDate(e.target.value)}
-											placeholder="예: 2026년 7월 10일 오후 6시"
-											className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 focus:border-kakao-yellow focus:ring-kakao-yellow bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 transition-all text-sm"
-										/>
-										<span className="text-[10px] text-gray-450 mt-1 block">
-											* 투표가 종료(Inactive)되었을 때 수강생들에게 보여줄 시작 일시를 입력합니다.
-										</span>
-									</div>
-
-									{/* Save Button */}
-									<button
-										type="submit"
-										disabled={adminSaving}
-										className="w-full py-3 bg-kakao-black dark:bg-white text-white dark:text-kakao-black hover:bg-gray-800 dark:hover:bg-gray-200 font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
-									>
-										{adminSaving ? (
-											<RefreshCw className="w-4 h-4 animate-spin" />
-										) : (
-											"설정사항 업데이트"
-										)}
-									</button>
-								</form>
-							</motion.div>
-						)}
 					</AnimatePresence>
 				)}
 			</div>
