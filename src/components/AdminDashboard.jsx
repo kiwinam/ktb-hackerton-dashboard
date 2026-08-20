@@ -25,6 +25,7 @@ import {
 	getMatchPolicyForGeneration,
 	getPairCount
 } from '../lib/votingMatchPolicy';
+import { buildProjectLikeRanking } from '../lib/projectLikeRanking';
 
 import {
 	getStudentsByGeneration,
@@ -1164,7 +1165,12 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			const wsProjects = XLSX.utils.json_to_sheet(projectData);
 			XLSX.utils.book_append_sheet(wb, wsProjects, "프로젝트별 승률 순위");
 
-			// 2. Student progress
+			// 2. Project likes ranking (includes projects without voting matches)
+			const likeRankingData = buildProjectLikeRanking(projects, selectedGen);
+			const wsLikes = XLSX.utils.json_to_sheet(likeRankingData);
+			XLSX.utils.book_append_sheet(wb, wsLikes, "프로젝트별 좋아요 순위");
+
+			// 3. Student progress
 			const studentData = filteredStudents.map(student => ({
 				"이름": student.name,
 				"과정": student.course,
@@ -1175,7 +1181,7 @@ const AdminDashboard = ({ projects, generations: propGenerations = [], onBackToG
 			const wsStudents = XLSX.utils.json_to_sheet(studentData);
 			XLSX.utils.book_append_sheet(wb, wsStudents, "수강생별 투표 현황");
 
-			// 3. Raw matchup voting logs
+			// 4. Raw matchup voting logs
 			const rawLogs = votesList.map((vote, i) => {
 				const projA = projectLookup[vote.projectA]?.title || "삭제된 프로젝트";
 				const projB = projectLookup[vote.projectB]?.title || "삭제된 프로젝트";
