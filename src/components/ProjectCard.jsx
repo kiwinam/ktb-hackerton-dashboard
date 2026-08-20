@@ -4,11 +4,14 @@ import { ExternalLink, Edit2, Heart, MessageCircle } from 'lucide-react';
 import { toggleLike } from '../lib/firebase';
 import ImageWithLoader from './ImageWithLoader';
 import { trackLikeProject, trackProjectLinkClick } from '../lib/analytics';
+import { getBrowserStorageKey } from '../lib/environment';
+
+const SESSION_ID_KEY = getBrowserStorageKey('hackathon_session_id');
 
 const ProjectCard = ({ project, onEdit, onClick, students = [] }) => {
 	const [isLiking, setIsLiking] = useState(false);
 	// const [commentCount, setCommentCount] = useState(0); // Removing local state
-	const sessionId = localStorage.getItem('hackathon_session_id');
+	const sessionId = localStorage.getItem(SESSION_ID_KEY);
 	const isLiked = project.likedBy?.includes(sessionId);
 	const serviceUrl = project.url?.trim();
 

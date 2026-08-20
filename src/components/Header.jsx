@@ -1,5 +1,6 @@
 import React from 'react';
 import { Plus, Moon, Sun, Vote, LayoutGrid } from 'lucide-react';
+import { IS_DEVELOPMENT_DATA } from '../lib/environment';
 
 const Header = ({
 	onRegister,
@@ -13,6 +14,11 @@ const Header = ({
 }) => {
 	return (
 		<header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 transition-colors duration-200">
+			{IS_DEVELOPMENT_DATA && (
+				<div className="bg-amber-400 px-3 py-1 text-center text-[11px] font-black tracking-wide text-amber-950">
+					DEV DATA · 개발용 Firebase 데이터에 연결됨
+				</div>
+			)}
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
 				<div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
 					<h1

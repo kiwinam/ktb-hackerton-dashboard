@@ -47,6 +47,8 @@
    npm run dev
    ```
 
+   `npm run dev`는 동일한 Firebase 프로젝트의 `dev_` 접두사 컬렉션과 `dev/` Storage 경로를 사용합니다. 화면 상단의 `DEV DATA` 표시로 연결 환경을 확인할 수 있습니다.
+
 3. **빌드**
    ```bash
    npm run build
@@ -65,5 +67,7 @@ npm run deploy
 ```bash
 ./deploy.sh
 ```
+
+`npm run build`, `npm run deploy`, `./deploy.sh`는 production 모드로 빌드되어 기존 접두사 없는 운영 컬렉션을 사용합니다.
 
 > **참고**: 배포를 위해서는 Firebase CLI가 설치되어 있고 로그인이 필요할 수 있습니다.

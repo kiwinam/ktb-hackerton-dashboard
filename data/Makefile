@@ -10,13 +10,16 @@ SA          := ./firebase-service-account.json   # 서비스 계정 JSON 경로
 EXCEL       ?= ""                                 # 엑셀 파일명 (필수)
 GENERATION  ?=                                    # 기수 번호 (선택, 생략 시 시트명 자동 추출)
 COURSE      ?=                                    # 과정명 강제 지정 (선택, 생략 시 B열 사용)
+TARGET      ?= dev                                # dev(기본) 또는 production
+INITIALIZE  ?= false                              # true면 dev 4기 설정 함께 생성
 SCRIPT      := import_students_to_firestore.py
 
 # ─── 내부 인자 조합 ───────────────────────────────────────────────────────────
 _BASE_ARGS  := --excel $(EXCEL) --service-account $(SA)
 _GEN_ARG    := $(if $(GENERATION),--generation $(GENERATION),)
 _CRS_ARG    := $(if $(COURSE),--course "$(COURSE)",)
-_ARGS       := $(_BASE_ARGS) $(_GEN_ARG) $(_CRS_ARG)
+_INIT_ARG   := $(if $(filter true,$(INITIALIZE)),--initialize-environment,)
+_ARGS       := $(_BASE_ARGS) $(_GEN_ARG) $(_CRS_ARG) --target $(TARGET) $(_INIT_ARG)
 
 # ─── 타겟 ─────────────────────────────────────────────────────────────────────
 .PHONY: help preview import
@@ -30,12 +33,13 @@ help:
 	@echo ""
 	@echo "사용법:"
 	@echo "  make preview  EXCEL=<파일명>  [GENERATION=N] [COURSE=과정명]"
-	@echo "  make import   EXCEL=<파일명>  [GENERATION=N] [COURSE=과정명]"
+	@echo "  make import   EXCEL=<파일명>  [GENERATION=N] [COURSE=과정명] [TARGET=dev|production]"
 	@echo ""
 	@echo "예시:"
 	@echo "  make preview EXCEL=\"4기_스프레드시트.xlsx\" GENERATION=4"
 	@echo "  make import  EXCEL=\"4기_스프레드시트.xlsx\" GENERATION=4"
 	@echo "  make import  EXCEL=\"5기_스프레드시트.xlsx\" GENERATION=5 COURSE=인공지능"
+	@echo "  make import  EXCEL=\"4기_스프레드시트.xlsx\" GENERATION=4 TARGET=dev INITIALIZE=true"
 	@echo ""
 
 ## preview: 미리보기 (Firestore에 저장하지 않음)

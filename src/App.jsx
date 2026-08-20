@@ -8,6 +8,10 @@ import ProjectCardSkeleton from './components/ProjectCardSkeleton';
 import Toast from './components/Toast';
 import { subscribeToProjects, verifyProjectPassword, getGenerations, getStudentsByGeneration } from './lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
+import { getBrowserStorageKey } from './lib/environment';
+
+const GALLERY_AUTH_KEY = getBrowserStorageKey('ktb_gallery_auth');
+const SESSION_ID_KEY = getBrowserStorageKey('hackathon_session_id');
 
 // Lazy Load Modals
 const RegisterModal = React.lazy(() => import('./components/RegisterModal'));
@@ -30,12 +34,12 @@ const getGalleryDefaultGeneration = (list) => {
 function App() {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('ktb_gallery_auth') === 'true';
+    return sessionStorage.getItem(GALLERY_AUTH_KEY) === 'true';
   });
 
   const handleLogin = () => {
     setIsAuthenticated(true);
-    sessionStorage.setItem('ktb_gallery_auth', 'true');
+    sessionStorage.setItem(GALLERY_AUTH_KEY, 'true');
   };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,8 +91,8 @@ function App() {
 
   // Generate Session ID for Likes if not exists and set GA user properties
   useEffect(() => {
-    if (!localStorage.getItem('hackathon_session_id')) {
-      localStorage.setItem('hackathon_session_id', Math.random().toString(36).substring(2, 15));
+    if (!localStorage.getItem(SESSION_ID_KEY)) {
+      localStorage.setItem(SESSION_ID_KEY, Math.random().toString(36).substring(2, 15));
     }
     setUserProperties({
       device_category: getDeviceType(),
@@ -119,7 +123,7 @@ function App() {
 
   const handlePasswordVerified = async (inputPassword) => {
     if (pendingEditProject) {
-      const sessionId = localStorage.getItem('hackathon_session_id');
+      const sessionId = localStorage.getItem(SESSION_ID_KEY);
       const result = await verifyProjectPassword(pendingEditProject.id, inputPassword, sessionId);
       if (result.success) {
         setEditingProject(pendingEditProject);

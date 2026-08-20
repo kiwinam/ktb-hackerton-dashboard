@@ -1,8 +1,22 @@
 // Analytics utility module for Google Analytics (gtag.js)
+import { IS_DEVELOPMENT_DATA } from './environment';
+
 const GA_MEASUREMENT_ID = 'G-CZBSB4PET4';
 
+if (!IS_DEVELOPMENT_DATA && typeof window !== 'undefined') {
+	window.dataLayer = window.dataLayer || [];
+	window.gtag = window.gtag || function gtag() { window.dataLayer.push(arguments); };
+	window.gtag('js', new Date());
+	window.gtag('config', GA_MEASUREMENT_ID, { send_page_view: false });
+
+	const analyticsScript = document.createElement('script');
+	analyticsScript.async = true;
+	analyticsScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+	document.head.appendChild(analyticsScript);
+}
+
 // Helper to check if gtag is available
-const isGtagAvailable = () => typeof window !== 'undefined' && typeof window.gtag === 'function';
+const isGtagAvailable = () => !IS_DEVELOPMENT_DATA && typeof window !== 'undefined' && typeof window.gtag === 'function';
 
 /**
  * Log a page or screen view

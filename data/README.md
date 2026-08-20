@@ -1,6 +1,6 @@
 # KTB 해커톤 대시보드 — 학생 데이터 임포트 가이드
 
-이 폴더에는 KTB 해커톤 대시보드의 Firestore `students` 컬렉션에 학생 데이터를 일괄 등록하는 스크립트가 있습니다.
+이 폴더에는 KTB 해커톤 대시보드의 Firestore 학생 컬렉션에 학생 데이터를 일괄 등록하는 스크립트가 있습니다. 기본 대상은 개발용 `dev_students`입니다.
 
 ---
 
@@ -84,7 +84,7 @@ cd data/
 make preview EXCEL="4기_스프레드시트.xlsx" GENERATION=4
 
 # 실제 Firestore 등록
-make import EXCEL="4기_스프레드시트.xlsx" GENERATION=4
+make import EXCEL="4기_스프레드시트.xlsx" GENERATION=4 TARGET=dev INITIALIZE=true
 
 # 과정명을 강제 지정할 때
 make import EXCEL="4기_스프레드시트.xlsx" GENERATION=4 COURSE=인공지능
@@ -121,6 +121,8 @@ python import_students_to_firestore.py \
 | `--sheet` | ❌ | 시트 이름 (생략 시 첫 번째 시트 사용) |
 | `--course` | ❌ | 과정명 강제 지정 (생략 시 B열 값 사용) |
 | `--commit` | ❌ | 실제 저장 여부. 없으면 미리보기만 실행 |
+| `--target` | ❌ | `dev` 또는 `production`. 기본값은 안전한 `dev` |
+| `--initialize-environment` | ❌ | `dev_generations/gen_4`, `dev_settings/system`, `dev_settings/voting` 초기화 |
 | `--errors-csv` | ❌ | 검증 실패 행 저장 경로 (기본: `students_import_errors.csv`) |
 
 ---

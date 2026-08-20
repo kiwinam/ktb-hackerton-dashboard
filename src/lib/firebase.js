@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { COLLECTIONS, IS_DEVELOPMENT_DATA, getStoragePath } from './environment';
+import { isStudentActive, normalizeStudentInput } from './studentManagement';
 
 const firebaseConfig = {
 	apiKey: "AIzaSyCm0Bul1xpqu6SejQyEJKlvRtarWSc7Jv0",
@@ -13,7 +15,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+const db = getFirestore(app);
 
 let storageInstance = null;
 const getStorageInstance = async () => {
@@ -27,7 +29,7 @@ const getStorageInstance = async () => {
 const uploadToStorage = async (path, thumbBlob) => {
 	const { ref, uploadBytes, getDownloadURL } = await import("firebase/storage");
 	const store = await getStorageInstance();
-	const storageRef = ref(store, path);
+	const storageRef = ref(store, getStoragePath(path));
 	await uploadBytes(storageRef, thumbBlob, {
 		contentType: thumbBlob.type,
 		cacheControl: 'public,max-age=31536000'
@@ -191,6 +193,75 @@ export const uploadThumbnailFromFile = async (file, projectId) => {
 	}
 };
 
+const sanitizeStorageFileName = (fileName = 'video.mp4') => (
+	fileName
+		.normalize('NFKD')
+		.replace(/[^a-zA-Z0-9._-]/g, '-')
+		.replace(/-+/g, '-')
+		.replace(/^-|-$/g, '')
+		.slice(-100) || 'video.mp4'
+);
+
+/**
+ * ELO 투표 영상을 Firebase Storage에 업로드합니다.
+ * 영상은 팀별 경로로 구분하고, 재개 가능한 업로드 진행률을 반환합니다.
+ */
+export const uploadVotingVideo = async (file, { projectId, generation, onProgress } = {}) => {
+	if (!file || !projectId) throw new Error('업로드할 영상 또는 프로젝트 정보가 없습니다.');
+
+	const { ref, uploadBytesResumable, getDownloadURL } = await import('firebase/storage');
+	const store = await getStorageInstance();
+	const safeFileName = sanitizeStorageFileName(file.name);
+	const path = getStoragePath(`videos/${Number(generation) || 'unknown'}/${projectId}/${Date.now()}-${safeFileName}`);
+	const storageRef = ref(store, path);
+	const uploadTask = uploadBytesResumable(storageRef, file, {
+		contentType: file.type || 'video/mp4',
+		cacheControl: 'public,max-age=31536000,immutable',
+		customMetadata: {
+			projectId: String(projectId),
+			generation: String(generation || '')
+		}
+	});
+
+	return new Promise((resolve, reject) => {
+		uploadTask.on('state_changed',
+			(snapshot) => {
+				const progress = snapshot.totalBytes > 0
+					? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+					: 0;
+				onProgress?.(progress);
+			},
+			reject,
+			async () => {
+				try {
+					resolve({
+						storagePath: path,
+						downloadUrl: await getDownloadURL(uploadTask.snapshot.ref),
+						fileName: file.name,
+						contentType: file.type || 'video/mp4',
+						size: file.size
+					});
+				} catch (error) {
+					reject(error);
+				}
+			}
+		);
+	});
+};
+
+export const deleteVotingVideo = async (storagePath) => {
+	if (!storagePath) return { success: true };
+	try {
+		const { ref, deleteObject } = await import('firebase/storage');
+		const store = await getStorageInstance();
+		await deleteObject(ref(store, storagePath));
+		return { success: true };
+	} catch (error) {
+		console.error('투표 영상 삭제 실패:', error);
+		return { success: false, error };
+	}
+};
+
 
 
 
@@ -214,13 +285,21 @@ import {
 	arrayUnion,
 	arrayRemove,
 	runTransaction,
-	writeBatch
+	writeBatch,
+	startAfter,
+	documentId
 } from "firebase/firestore";
 import { hashPassword } from "./crypto";
 
-const COLLECTION_NAME = "projects";
-const PROJECT_SECRETS_COLLECTION = "project_secrets";
-const COMMENT_SECRETS_COLLECTION = "comment_secrets";
+const COLLECTION_NAME = COLLECTIONS.projects;
+const PROJECT_SECRETS_COLLECTION = COLLECTIONS.projectSecrets;
+const COMMENT_SECRETS_COLLECTION = COLLECTIONS.commentSecrets;
+const RATE_LIMIT_COLLECTION = COLLECTIONS.rateLimits;
+const SETTINGS_COLLECTION = COLLECTIONS.settings;
+const STUDENTS_COLLECTION = COLLECTIONS.students;
+const VOTES_COLLECTION = COLLECTIONS.votes;
+const MATCHUPS_COLLECTION = COLLECTIONS.matchups;
+const GENERATIONS_COLLECTION = COLLECTIONS.generations;
 
 export const addProject = async (projectData) => {
 	try {
@@ -433,7 +512,6 @@ export const updateComment = async (projectId, commentId, password, newContent) 
 
 // Rate Limiter Helper
 const checkRateLimit = async (sessionId) => {
-	const RATE_LIMIT_COLLECTION = "rate_limits";
 	const limitRef = doc(db, RATE_LIMIT_COLLECTION, sessionId);
 
 	try {
@@ -532,7 +610,7 @@ export const syncCommentCounts = async () => {
 // System Settings (Entry Password)
 export const verifySystemPassword = async (inputPassword) => {
 	try {
-		const docRef = doc(db, "settings", "system");
+		const docRef = doc(db, SETTINGS_COLLECTION, "system");
 		const docSnap = await getDoc(docRef);
 		const inputHash = await hashPassword(inputPassword);
 
@@ -654,38 +732,99 @@ export const getDeploymentCount = async (projectId) => {
 
 // --- ELO Voting & Settings System ---
 
+export const subscribeToVotingSettings = (callback, onError) => {
+	const docRef = doc(db, SETTINGS_COLLECTION, "voting");
+	return onSnapshot(docRef,
+		(docSnap) => callback(docSnap.exists() ? docSnap.data() : null),
+		(error) => {
+			console.error("Settings subscription error:", error);
+			onError?.(error);
+		}
+	);
+};
+
 export const getVotingSettings = async () => {
 	try {
-		const docRef = doc(db, "settings", "voting");
+		const docRef = doc(db, SETTINGS_COLLECTION, "voting");
 		const docSnap = await getDoc(docRef);
 		if (docSnap.exists()) {
 			return docSnap.data();
 		} else {
 			const defaultSettings = {
-				isActive: true,
+				isActive: !IS_DEVELOPMENT_DATA,
 				generation: 4,
-				// 기수별 참여 팀을 지정하지 않으면 해당 기수의 전체 팀이 투표에 참여합니다.
-				eligibleProjectIdsByGeneration: {},
-				createdAt: serverTimestamp()
-			};
+				startAt: null,
+				startDate: "",
+					// 3기는 기존 전체 팀 투표를 유지하고, 4기부터는 관리자 대상 선택이 필요합니다.
+					eligibleProjectIdsByGeneration: {},
+					matchPolicyByGeneration: {},
+					createdAt: serverTimestamp()
+				};
 			await setDoc(docRef, defaultSettings);
 			return defaultSettings;
 		}
 	} catch (error) {
 		console.error("Error getting voting settings:", error);
-		return { isActive: false, generation: 4, eligibleProjectIdsByGeneration: {} };
+			return { isActive: false, generation: 4, eligibleProjectIdsByGeneration: {}, matchPolicyByGeneration: {} };
 	}
 };
 
 export const saveVotingSettings = async (settings) => {
 	try {
-		const docRef = doc(db, "settings", "voting");
+		const docRef = doc(db, SETTINGS_COLLECTION, "voting");
 		const hasEligibleProjectSettings = Object.prototype.hasOwnProperty.call(settings || {}, "eligibleProjectIdsByGeneration");
+		const hasMatchPolicySettings = Object.prototype.hasOwnProperty.call(settings || {}, "matchPolicyByGeneration");
 		const eligibleProjectIdsByGeneration = Object.entries(settings?.eligibleProjectIdsByGeneration || {}).reduce((result, [generation, projectIds]) => {
 			const generationNumber = Number(generation);
 			if (Number.isInteger(generationNumber) && generationNumber > 0 && Array.isArray(projectIds)) {
 				result[String(generationNumber)] = [...new Set(projectIds.filter((projectId) => typeof projectId === 'string' && projectId))];
 			}
+			return result;
+		}, {});
+		const matchPolicyByGeneration = Object.entries(settings?.matchPolicyByGeneration || {}).reduce((result, [generation, policy]) => {
+			const generationNumber = Number(generation);
+			if (!Number.isInteger(generationNumber) || generationNumber <= 0 || !policy || typeof policy !== 'object' || Array.isArray(policy)) {
+				return result;
+			}
+
+			const mode = policy.mode === 'manual' ? 'manual' : 'auto';
+			const voterCount = Number(policy.voterCount);
+			const finalistMemberCount = Number(policy.finalistMemberCount);
+			const teamCount = Number(policy.teamCount);
+			const manualMatchesPerVoter = Number(policy.manualMatchesPerVoter);
+			const resolvedMatchesPerVoter = Number(policy.resolvedMatchesPerVoter);
+			const initialElo = Number(policy.initialElo);
+			const kFactor = Number(policy.kFactor);
+			if (
+				!Number.isInteger(voterCount) || voterCount <= 0
+				|| !Number.isInteger(finalistMemberCount) || finalistMemberCount < 0 || finalistMemberCount > voterCount
+				|| !Number.isInteger(teamCount) || teamCount < 2
+				|| !Number.isInteger(resolvedMatchesPerVoter) || resolvedMatchesPerVoter <= 0
+				|| !Number.isInteger(initialElo) || initialElo <= 0
+				|| !Number.isInteger(kFactor) || kFactor <= 0
+			) {
+				return result;
+			}
+
+			result[String(generationNumber)] = {
+				mode,
+				voterCount,
+				finalistMemberCount,
+				teamCount,
+				manualMatchesPerVoter: Number.isInteger(manualMatchesPerVoter) && manualMatchesPerVoter > 0
+					? manualMatchesPerVoter
+					: resolvedMatchesPerVoter,
+				resolvedMatchesPerVoter,
+				initialElo,
+				kFactor,
+				formulaVersion: typeof policy.formulaVersion === 'string' ? policy.formulaVersion : '',
+				confidenceLevel: Number(policy.confidenceLevel) || 0.95,
+				marginOfError: Number(policy.marginOfError) || 0.10,
+				pairCount: Number(policy.pairCount) || 0,
+				sampleSizePerPair: Number(policy.sampleSizePerPair) || 0,
+				targetTotalMatches: Number(policy.targetTotalMatches) || 0,
+				expectedTotalMatches: Number(policy.expectedTotalMatches) || 0
+			};
 			return result;
 		}, {});
 		const cleanSettings = {
@@ -694,8 +833,16 @@ export const saveVotingSettings = async (settings) => {
 			startDate: settings?.startDate ? String(settings.startDate).trim() : "",
 			updatedAt: serverTimestamp()
 		};
+		if (Object.prototype.hasOwnProperty.call(settings || {}, "startAt")) {
+			cleanSettings.startAt = settings.startAt instanceof Date && Number.isFinite(settings.startAt.getTime())
+				? settings.startAt
+				: null;
+		}
 		if (hasEligibleProjectSettings) {
 			cleanSettings.eligibleProjectIdsByGeneration = eligibleProjectIdsByGeneration;
+		}
+		if (hasMatchPolicySettings) {
+			cleanSettings.matchPolicyByGeneration = matchPolicyByGeneration;
 		}
 		await setDoc(docRef, cleanSettings, { merge: true });
 		return { success: true };
@@ -708,7 +855,7 @@ export const saveVotingSettings = async (settings) => {
 export const verifyStudentVoter = async (generation, course, name, birthdate) => {
 	try {
 		const q = query(
-			collection(db, "students"),
+			collection(db, STUDENTS_COLLECTION),
 			where("generation", "==", Number(generation)),
 			where("course", "==", course),
 			where("kor_name", "==", name.trim()),
@@ -719,6 +866,12 @@ export const verifyStudentVoter = async (generation, course, name, birthdate) =>
 		if (!snap.empty) {
 			const docSnap = snap.docs[0];
 			const studentData = docSnap.data();
+			if (!isStudentActive(studentData)) {
+				return {
+					success: false,
+					error: "현재 비활성화된 학생 계정입니다. 관리자에게 문의해주세요."
+				};
+			}
 			return {
 				success: true,
 				voter: {
@@ -743,7 +896,7 @@ export const verifyStudentVoter = async (generation, course, name, birthdate) =>
 
 export const seedTestStudents = async () => {
 	try {
-		const studentRef = collection(db, "students");
+		const studentRef = collection(db, STUDENTS_COLLECTION);
 		const countSnap = await getCountFromServer(studentRef);
 		if (countSnap.data().count > 0) {
 			return; // Already seeded
@@ -773,7 +926,7 @@ export const seedTestStudents = async () => {
 		];
 
 		for (const student of testStudents) {
-			await setDoc(doc(db, "students", student.id), student);
+			await setDoc(doc(db, STUDENTS_COLLECTION, student.id), student);
 		}
 		console.log("Successfully seeded test students!");
 	} catch (e) {
@@ -784,16 +937,18 @@ export const seedTestStudents = async () => {
 // Auto seed disabled for optimization
 // seedTestStudents();
 
-export const submitVote = async (voterEmail, projectA, projectB, winner, generation) => {
+export const submitVote = async (voterEmail, projectA, projectB, winner, generation, initialElo = 1500, kFactor = 32) => {
 	try {
+		const safeInitialElo = Number.isInteger(Number(initialElo)) && Number(initialElo) > 0 ? Number(initialElo) : 1500;
+		const safeKFactor = Number.isInteger(Number(kFactor)) && Number(kFactor) > 0 ? Number(kFactor) : 32;
 		const pairId = [projectA, projectB].sort().join("_");
 		const voteId = `${voterEmail}_${pairId}`;
 
-		const voteRef = doc(db, "votes", voteId);
-		const studentRef = doc(db, "students", voterEmail);
-		const matchRef = doc(db, "matchups", pairId);
-		const projARef = doc(db, "projects", projectA);
-		const projBRef = doc(db, "projects", projectB);
+		const voteRef = doc(db, VOTES_COLLECTION, voteId);
+		const studentRef = doc(db, STUDENTS_COLLECTION, voterEmail);
+		const matchRef = doc(db, MATCHUPS_COLLECTION, pairId);
+		const projARef = doc(db, COLLECTION_NAME, projectA);
+		const projBRef = doc(db, COLLECTION_NAME, projectB);
 
 		await runTransaction(db, async (transaction) => {
 			// 1. Read necessary docs
@@ -811,8 +966,10 @@ export const submitVote = async (voterEmail, projectA, projectB, winner, generat
 			}
 
 			// 2. Extract current values
-			const currentAScore = projASnap.exists() ? (projASnap.data().elo || 1500) : 1500;
-			const currentBScore = projBSnap.exists() ? (projBSnap.data().elo || 1500) : 1500;
+			const savedAScore = projASnap.exists() ? Number(projASnap.data().elo) : NaN;
+			const savedBScore = projBSnap.exists() ? Number(projBSnap.data().elo) : NaN;
+			const currentAScore = Number.isFinite(savedAScore) ? savedAScore : safeInitialElo;
+			const currentBScore = Number.isFinite(savedBScore) ? savedBScore : safeInitialElo;
 
 			const currentAWins = projASnap.exists() ? (projASnap.data().wins || 0) : 0;
 			const currentALosses = projASnap.exists() ? (projASnap.data().losses || 0) : 0;
@@ -823,15 +980,14 @@ export const submitVote = async (voterEmail, projectA, projectB, winner, generat
 			const currentBMatches = projBSnap.exists() ? (projBSnap.data().totalMatches || 0) : 0;
 
 			// 3. ELO rating change calculation
-			const K_FACTOR = 32;
 			const eA = 1 / (1 + Math.pow(10, (currentBScore - currentAScore) / 400));
 			const eB = 1 / (1 + Math.pow(10, (currentAScore - currentBScore) / 400));
 
 			const sA = winner === projectA ? 1 : 0;
 			const sB = winner === projectB ? 1 : 0;
 
-			const newAScore = Math.round(currentAScore + K_FACTOR * (sA - eA));
-			const newBScore = Math.round(currentBScore + K_FACTOR * (sB - eB));
+			const newAScore = Math.round(currentAScore + safeKFactor * (sA - eA));
+			const newBScore = Math.round(currentBScore + safeKFactor * (sB - eB));
 
 			// 4. Update Matchup
 			let matchData = {
@@ -894,7 +1050,7 @@ export const submitVote = async (voterEmail, projectA, projectB, winner, generat
 export const getVoterVotes = async (voterEmail) => {
 	try {
 		const q = query(
-			collection(db, "votes"),
+			collection(db, VOTES_COLLECTION),
 			where("voterEmail", "==", voterEmail)
 		);
 		const snap = await getDocs(q);
@@ -908,7 +1064,7 @@ export const getVoterVotes = async (voterEmail) => {
 export const getVotesByGeneration = async (generation) => {
 	try {
 		const q = query(
-			collection(db, "votes"),
+			collection(db, VOTES_COLLECTION),
 			where("generation", "==", generation)
 		);
 		const snap = await getDocs(q);
@@ -921,7 +1077,7 @@ export const getVotesByGeneration = async (generation) => {
 
 export const getGenerations = async () => {
 	try {
-		const coll = collection(db, "generations");
+		const coll = collection(db, GENERATIONS_COLLECTION);
 		const snap = await getDocs(coll);
 		if (snap.empty) {
 			const defaults = [
@@ -931,7 +1087,7 @@ export const getGenerations = async () => {
 				{ id: "gen_4", value: 4, name: "4기", order: 4, visible: true, isDefault: true },
 			];
 			for (const gen of defaults) {
-				await setDoc(doc(db, "generations", gen.id), gen);
+				await setDoc(doc(db, GENERATIONS_COLLECTION, gen.id), gen);
 			}
 			return defaults.sort((a, b) => a.order - b.order);
 		}
@@ -960,7 +1116,7 @@ export const getGenerations = async () => {
 
 export const updateGeneration = async (genId, data) => {
 	try {
-		const genRef = doc(db, "generations", genId);
+		const genRef = doc(db, GENERATIONS_COLLECTION, genId);
 		const payload = {
 			...data,
 			id: genId,
@@ -976,7 +1132,7 @@ export const updateGeneration = async (genId, data) => {
 
 export const deleteGeneration = async (genId) => {
 	try {
-		const genRef = doc(db, "generations", genId);
+		const genRef = doc(db, GENERATIONS_COLLECTION, genId);
 		await deleteDoc(genRef);
 		return { success: true };
 	} catch (error) {
@@ -992,7 +1148,7 @@ export const updateSystemPassword = async (currentPassword, newPassword) => {
 			return { success: false, error: "현재 비밀번호가 일치하지 않습니다." };
 		}
 		const newHash = await hashPassword(newPassword);
-		const docRef = doc(db, "settings", "system");
+		const docRef = doc(db, SETTINGS_COLLECTION, "system");
 		await setDoc(docRef, { entryPassword: newHash }, { merge: true });
 		return { success: true };
 	} catch (error) {
@@ -1004,7 +1160,7 @@ export const updateSystemPassword = async (currentPassword, newPassword) => {
 // System Settings (Admin Master Password)
 export const verifyAdminPassword = async (inputPassword) => {
 	try {
-		const docRef = doc(db, "settings", "system");
+		const docRef = doc(db, SETTINGS_COLLECTION, "system");
 		const docSnap = await getDoc(docRef);
 		const inputHash = await hashPassword(inputPassword);
 
@@ -1037,7 +1193,7 @@ export const updateAdminPassword = async (currentPassword, newPassword) => {
 			return { success: false, error: "현재 비밀번호가 일치하지 않습니다." };
 		}
 		const newHash = await hashPassword(newPassword);
-		const docRef = doc(db, "settings", "system");
+		const docRef = doc(db, SETTINGS_COLLECTION, "system");
 		await setDoc(docRef, { adminPassword: newHash }, { merge: true });
 		return { success: true };
 	} catch (error) {
@@ -1094,17 +1250,157 @@ export const adminUpdateProjectPassword = async (projectId, newPassword) => {
 	}
 };
 
-export const getStudentsByGeneration = async (generation) => {
+export const getStudentsByGeneration = async (generation, { includeInactive = false } = {}) => {
 	try {
 		const q = query(
-			collection(db, "students"),
+			collection(db, STUDENTS_COLLECTION),
 			where("generation", "==", Number(generation))
 		);
 		const snap = await getDocs(q);
-		return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		return snap.docs
+			.map(doc => ({ id: doc.id, ...doc.data() }))
+			.filter(student => includeInactive || isStudentActive(student));
 	} catch (error) {
 		console.error("Error getting students by generation:", error);
 		return [];
+	}
+};
+
+const toStudentPageSize = (value) => {
+	const size = Number(value);
+	return Number.isInteger(size) && size > 0 && size <= 100 ? size : 20;
+};
+
+const findDuplicateStudent = async ({ generation, course, kor_name: korName, birthdate }, excludedId = null) => {
+	const duplicateQuery = query(
+		collection(db, STUDENTS_COLLECTION),
+		where('generation', '==', generation),
+		where('course', '==', course),
+		where('kor_name', '==', korName),
+		where('birthdate', '==', birthdate)
+	);
+	const snapshot = await getDocs(duplicateQuery);
+	return snapshot.docs.find((studentDoc) => studentDoc.id !== excludedId) || null;
+};
+
+/**
+ * 기수별 학생 목록을 Firestore 커서로 조회합니다.
+ * cursor는 이전 응답의 lastCursor를 그대로 전달해야 합니다.
+ */
+export const getStudentsPage = async ({ generation, pageSize = 20, cursor = null } = {}) => {
+	try {
+		const safeGeneration = Number(generation);
+		if (!Number.isInteger(safeGeneration) || safeGeneration <= 0) {
+			throw new Error('유효한 기수를 선택해주세요.');
+		}
+		const safePageSize = toStudentPageSize(pageSize);
+		const constraints = [
+			where('generation', '==', safeGeneration),
+			// 기존 테스트/레거시 학생도 name 필드는 가지고 있어 누락 없이 페이지에 포함됩니다.
+			orderBy('name'),
+			orderBy(documentId()),
+			limit(safePageSize + 1)
+		];
+		if (cursor) constraints.splice(3, 0, startAfter(cursor));
+
+		const [snapshot, countSnapshot] = await Promise.all([
+			getDocs(query(collection(db, STUDENTS_COLLECTION), ...constraints)),
+			getCountFromServer(query(collection(db, STUDENTS_COLLECTION), where('generation', '==', safeGeneration)))
+		]);
+		const hasNextPage = snapshot.docs.length > safePageSize;
+		const pageDocs = snapshot.docs.slice(0, safePageSize);
+
+		return {
+			students: pageDocs.map((studentDoc) => ({ id: studentDoc.id, ...studentDoc.data() })),
+			total: countSnapshot.data().count,
+			hasNextPage,
+			lastCursor: pageDocs.at(-1) || null
+		};
+	} catch (error) {
+		console.error('Error getting paged students:', error);
+		return { students: [], total: 0, hasNextPage: false, lastCursor: null, error };
+	}
+};
+
+export const createStudent = async (input) => {
+	try {
+		const student = normalizeStudentInput(input);
+		const duplicate = await findDuplicateStudent(student);
+		if (duplicate) {
+			return { success: false, error: '같은 기수·과정·국문명·생년월일의 학생이 이미 등록되어 있습니다.' };
+		}
+
+		const docRef = doc(collection(db, STUDENTS_COLLECTION));
+		await setDoc(docRef, {
+			...student,
+			id: docRef.id,
+			isAdmin: false,
+			voteCount: 0,
+			createdAt: serverTimestamp(),
+			updatedAt: serverTimestamp()
+		});
+		return { success: true, student: { id: docRef.id, ...student, isAdmin: false, voteCount: 0 } };
+	} catch (error) {
+		console.error('Error creating student:', error);
+		return { success: false, error: error.message || String(error) };
+	}
+};
+
+export const updateStudent = async (studentId, input) => {
+	try {
+		if (!studentId) throw new Error('수정할 학생 정보가 없습니다.');
+		const student = normalizeStudentInput(input);
+		const duplicate = await findDuplicateStudent(student, studentId);
+		if (duplicate) {
+			return { success: false, error: '같은 기수·과정·국문명·생년월일의 학생이 이미 등록되어 있습니다.' };
+		}
+
+		await updateDoc(doc(db, STUDENTS_COLLECTION, studentId), {
+			...student,
+			updatedAt: serverTimestamp()
+		});
+		return { success: true, student: { id: studentId, ...student } };
+	} catch (error) {
+		console.error('Error updating student:', error);
+		return { success: false, error: error.message || String(error) };
+	}
+};
+
+export const getStudentDependencies = async (student) => {
+	try {
+		if (!student?.id) throw new Error('학생 정보가 없습니다.');
+		const [votesSnapshot, projectsSnapshot] = await Promise.all([
+			getDocs(query(collection(db, VOTES_COLLECTION), where('voterEmail', '==', student.id))),
+			getDocs(query(collection(db, COLLECTION_NAME), where('members', 'array-contains', student.name)))
+		]);
+		return {
+			success: true,
+			voteCount: votesSnapshot.size,
+			projectCount: projectsSnapshot.size
+		};
+	} catch (error) {
+		console.error('Error getting student dependencies:', error);
+		return { success: false, error: error.message || String(error) };
+	}
+};
+
+export const deleteStudent = async (student) => {
+	try {
+		const dependencies = await getStudentDependencies(student);
+		if (!dependencies.success) return dependencies;
+		if (dependencies.voteCount > 0 || dependencies.projectCount > 0) {
+			return {
+				success: false,
+				hasDependencies: true,
+				error: `투표 ${dependencies.voteCount}건, 프로젝트 ${dependencies.projectCount}건과 연결되어 있어 삭제할 수 없습니다. 비활성화를 사용해주세요.`,
+				dependencies
+			};
+		}
+		await deleteDoc(doc(db, STUDENTS_COLLECTION, student.id));
+		return { success: true };
+	} catch (error) {
+		console.error('Error deleting student:', error);
+		return { success: false, error: error.message || String(error) };
 	}
 };
 
@@ -1113,7 +1409,7 @@ export const getStudentsByGeneration = async (generation) => {
 export const getMatchupsByGeneration = async (generation) => {
 	try {
 		const q = query(
-			collection(db, "matchups"),
+			collection(db, MATCHUPS_COLLECTION),
 			where("generation", "==", Number(generation))
 		);
 		const snap = await getDocs(q);
@@ -1124,10 +1420,12 @@ export const getMatchupsByGeneration = async (generation) => {
 	}
 };
 
-export const syncVotingData = async (generation) => {
+export const syncVotingData = async (generation, initialElo = 1500, kFactor = 32) => {
 	try {
+		const safeInitialElo = Number.isInteger(Number(initialElo)) && Number(initialElo) > 0 ? Number(initialElo) : 1500;
+		const safeKFactor = Number.isInteger(Number(kFactor)) && Number(kFactor) > 0 ? Number(kFactor) : 32;
 		// 1. Get all votes for the generation
-		const votesRef = collection(db, "votes");
+		const votesRef = collection(db, VOTES_COLLECTION);
 		const votesQuery = query(votesRef, where("generation", "==", Number(generation)));
 		const votesSnap = await getDocs(votesQuery);
 		const allVotes = votesSnap.docs.map(doc => doc.data());
@@ -1140,13 +1438,13 @@ export const syncVotingData = async (generation) => {
 		});
 
 		// 2. Fetch all projects for the generation
-		const projectsRef = collection(db, "projects");
+		const projectsRef = collection(db, COLLECTION_NAME);
 		const projectsQuery = query(projectsRef, where("generation", "==", Number(generation)));
 		const projectsSnap = await getDocs(projectsQuery);
 		const projectsList = projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
 		// 3. Fetch all students for the generation
-		const studentsRef = collection(db, "students");
+		const studentsRef = collection(db, STUDENTS_COLLECTION);
 		const studentsQuery = query(studentsRef, where("generation", "==", Number(generation)));
 		const studentsSnap = await getDocs(studentsQuery);
 		const studentsList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1154,7 +1452,7 @@ export const syncVotingData = async (generation) => {
 		// 4. Initialize stats mapping
 		const projectStats = {};
 		projectsList.forEach(p => {
-			projectStats[p.id] = { elo: 1500, wins: 0, losses: 0, totalMatches: 0 };
+			projectStats[p.id] = { elo: safeInitialElo, wins: 0, losses: 0, totalMatches: 0 };
 		});
 
 		const studentStats = {};
@@ -1168,15 +1466,14 @@ export const syncVotingData = async (generation) => {
 		allVotes.forEach(vote => {
 			const { projectA, projectB, winner, voterEmail } = vote;
 
-			if (!projectStats[projectA]) projectStats[projectA] = { elo: 1500, wins: 0, losses: 0, totalMatches: 0 };
-			if (!projectStats[projectB]) projectStats[projectB] = { elo: 1500, wins: 0, losses: 0, totalMatches: 0 };
+			if (!projectStats[projectA]) projectStats[projectA] = { elo: safeInitialElo, wins: 0, losses: 0, totalMatches: 0 };
+			if (!projectStats[projectB]) projectStats[projectB] = { elo: safeInitialElo, wins: 0, losses: 0, totalMatches: 0 };
 
 			if (voterEmail) {
 				if (!studentStats[voterEmail]) studentStats[voterEmail] = { voteCount: 0 };
 				studentStats[voterEmail].voteCount++;
 			}
 
-			const K_FACTOR = 32;
 			const rA = projectStats[projectA].elo;
 			const rB = projectStats[projectB].elo;
 
@@ -1186,8 +1483,8 @@ export const syncVotingData = async (generation) => {
 			const sA = winner === projectA ? 1 : 0;
 			const sB = winner === projectB ? 1 : 0;
 
-			projectStats[projectA].elo = Math.round(rA + K_FACTOR * (sA - eA));
-			projectStats[projectB].elo = Math.round(rB + K_FACTOR * (sB - eB));
+			projectStats[projectA].elo = Math.round(rA + safeKFactor * (sA - eA));
+			projectStats[projectB].elo = Math.round(rB + safeKFactor * (sB - eB));
 
 			projectStats[projectA].totalMatches++;
 			projectStats[projectB].totalMatches++;
@@ -1224,7 +1521,7 @@ export const syncVotingData = async (generation) => {
 		projectsList.forEach(p => {
 			const stats = projectStats[p.id];
 			if (stats) {
-				const ref = doc(db, "projects", p.id);
+				const ref = doc(db, COLLECTION_NAME, p.id);
 				batch.update(ref, stats);
 			}
 		});
@@ -1232,12 +1529,12 @@ export const syncVotingData = async (generation) => {
 		studentsList.forEach(s => {
 			const stats = studentStats[s.id];
 			const count = stats ? stats.voteCount : 0;
-			const ref = doc(db, "students", s.id);
+			const ref = doc(db, STUDENTS_COLLECTION, s.id);
 			batch.update(ref, { voteCount: count });
 		});
 
 		Object.entries(matchupStats).forEach(([pairId, data]) => {
-			const ref = doc(db, "matchups", pairId);
+			const ref = doc(db, MATCHUPS_COLLECTION, pairId);
 			batch.set(ref, data);
 		});
 

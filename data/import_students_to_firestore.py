@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import re
 import sys
 from datetime import date, datetime
@@ -91,6 +92,17 @@ def parse_args() -> argparse.Namespace:
         "--commit",
         action="store_true",
         help="실제 Firestore에 저장합니다. 생략하면 미리보기만 실행합니다.",
+    )
+    parser.add_argument(
+        "--target",
+        choices=["dev", "production"],
+        default="dev",
+        help="저장 환경. 기본값 dev는 dev_ 컬렉션을 사용합니다.",
+    )
+    parser.add_argument(
+        "--initialize-environment",
+        action="store_true",
+        help="dev_generations와 dev_settings의 4기 기본 설정을 함께 생성합니다. dev에서만 사용할 수 있습니다.",
     )
     parser.add_argument(
         "--errors-csv",
@@ -274,16 +286,68 @@ def initialize_firestore(service_account_path: Path):
     return firestore.client()
 
 
-def write_students(db, students: list[dict[str, Any]]) -> int:
+def collection_name(base_name: str, target: str) -> str:
+    return f"dev_{base_name}" if target == "dev" else base_name
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def initialize_dev_environment(db) -> None:
+    """4기 개발 환경의 기수 및 시스템·투표 기본 설정을 생성합니다."""
+    generations = db.collection(collection_name("generations", "dev"))
+    settings = db.collection(collection_name("settings", "dev"))
+
+    generations.document("gen_4").set(
+        {
+            "id": "gen_4",
+            "value": 4,
+            "name": "4기",
+            "order": 4,
+            "visible": True,
+            "isDefault": True,
+        },
+        merge=True,
+    )
+
+    system_ref = settings.document("system")
+    if not system_ref.get().exists:
+        default_password_hash = sha256_text("1234")
+        system_ref.set(
+            {
+                "entryPassword": default_password_hash,
+                "adminPassword": default_password_hash,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+    voting_ref = settings.document("voting")
+    if not voting_ref.get().exists:
+        voting_ref.set(
+            {
+                "isActive": False,
+                "generation": 4,
+                "startDate": "",
+                "eligibleProjectIdsByGeneration": {},
+                "createdAt": firestore.SERVER_TIMESTAMP,
+            }
+        )
+
+    print("[완료] dev_generations/gen_4 및 dev_settings 초기화 완료")
+
+
+def write_students(db, students: list[dict[str, Any]], target: str) -> int:
     """Firestore에 최대 500건 단위로 batch write 합니다."""
     committed_count = 0
+    target_collection = collection_name(COLLECTION_NAME, target)
 
     for start in range(0, len(students), BATCH_LIMIT):
         chunk = students[start : start + BATCH_LIMIT]
         batch = db.batch()
 
         for student in chunk:
-            document_ref = db.collection(COLLECTION_NAME).document(student["document_id"])
+            document_ref = db.collection(target_collection).document(student["document_id"])
             batch.set(document_ref, student["data"], merge=False)
 
         batch.commit()
@@ -327,11 +391,13 @@ def main() -> int:
     print("===== 가져오기 미리보기 =====")
     print(f"시트: {sheet_name}")
     print(f"기수: {generation}")
+    print(f"대상 환경: {args.target}")
+    print(f"대상 컬렉션: {collection_name(COLLECTION_NAME, args.target)}")
     print(f"정상 데이터: {len(students)}건")
     print(f"검증 실패: {len(errors)}건")
 
     for student in students[:5]:
-        print(f"- students/{student['document_id']}")
+        print(f"- {collection_name(COLLECTION_NAME, args.target)}/{student['document_id']}")
         print(f"  {student['data']}")
 
     if len(students) > 5:
@@ -347,15 +413,21 @@ def main() -> int:
         print("실제 저장하려면 명령 끝에 --commit 옵션을 추가하세요.")
         return 0
 
+    if args.initialize_environment and args.target != "dev":
+        print("[오류] --initialize-environment는 dev 대상에서만 사용할 수 있습니다.", file=sys.stderr)
+        return 1
+
     try:
         db = initialize_firestore(service_account_path)
-        committed_count = write_students(db, students)
+        if args.initialize_environment:
+            initialize_dev_environment(db)
+        committed_count = write_students(db, students, args.target)
     except Exception as exc:
         print(f"[오류] Firestore 저장 실패: {exc}", file=sys.stderr)
         return 1
 
     print() 
-    print(f"[성공] students 컬렉션에 {committed_count}건을 저장했습니다.")
+    print(f"[성공] {collection_name(COLLECTION_NAME, args.target)} 컬렉션에 {committed_count}건을 저장했습니다.")
     return 0
 
 

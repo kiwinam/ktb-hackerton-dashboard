@@ -10,6 +10,9 @@ import { trackLikeProject, trackProjectLinkClick, trackAddComment, trackDeleteCo
 import ConfirmModal from './ConfirmModal';
 import { checkProfanity } from '../lib/profanityFilter';
 import ImageWithLoader from './ImageWithLoader';
+import { getBrowserStorageKey } from '../lib/environment';
+
+const SESSION_ID_KEY = getBrowserStorageKey('hackathon_session_id');
 
 const preprocessMarkdown = (text) => {
 	if (!text) return '';
@@ -69,7 +72,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 	const VERSION_REGEX = /^\d+\.\d+\.\d+$/;
 
 	const [isLiking, setIsLiking] = useState(false);
-	const sessionId = localStorage.getItem('hackathon_session_id');
+	const sessionId = localStorage.getItem(SESSION_ID_KEY);
 	const isLiked = project?.likedBy?.includes(sessionId);
 
 	const handleLike = async (e) => {
@@ -180,7 +183,7 @@ const ProjectDetailModal = ({ project, isOpen, onClose, onCommentSuccess, showTo
 	};
 
 	const handlePasswordVerify = async (inputPassword) => {
-		const sessionId = localStorage.getItem('hackathon_session_id');
+		const sessionId = localStorage.getItem(SESSION_ID_KEY);
 		if (passwordModalMode === 'delete') {
 			const result = await verifyCommentPassword(project.id, deleteTargetId, inputPassword, sessionId);
 			if (result.success) {

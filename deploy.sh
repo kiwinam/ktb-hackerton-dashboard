@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build the project
+# deploy.sh는 항상 production 모드로 빌드하여 접두사 없는 운영 컬렉션을 사용합니다.
 echo "🏗️  Building project..."
 npm run build
 
